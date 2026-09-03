@@ -6,13 +6,17 @@ Linux**. Same app as the website — plus, on Windows, it can run the scrim
 
 ## Use it
 
-Grab an installer from the repo's **Releases** page (built by CI on every
-`desktop-v*` tag):
+Grab an installer from the repo's **[Releases](https://github.com/nixcey/sightline/releases)**
+page:
 
-- **Windows** — `Sightline-Setup-x.y.z.exe`
-- **Linux** — `Sightline-x.y.z.AppImage` (or the `.deb`)
+- **Windows** — `Sightline-Setup-x.y.z.exe` → double-click → next/next/finish.
+  It's unsigned, so Windows SmartScreen shows *"Windows protected your PC"* →
+  **More info → Run anyway** (once).
+- **Linux** — `Sightline-x.y.z.AppImage` (right-click → Properties → *Allow
+  executing*, then double-click), or `Sightline-x.y.z.deb` (`sudo dpkg -i` /
+  double-click in a software centre).
 
-Sign in as usual. On Windows, **Scrims → Scrim importer** now has a *"Run the
+Sign in as usual. On Windows, **Scrims → Scrim importer** has a *"Run the
 agent on this PC"* section:
 
 - paste your ingest key once (saved to the OS user-data folder, not the bundle)

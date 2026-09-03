@@ -26,10 +26,23 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+
+      - name: deb tooling (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y fakeroot
+
       - run: npm ci
         working-directory: desktop
+
+      - name: version from tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#desktop-v}"
+        working-directory: desktop
+
       - run: npm run ${{ matrix.cmd }}
         working-directory: desktop
+
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}
@@ -50,7 +63,18 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
-          draft: true
+          files: artifacts/*
+          draft: false
+          make_latest: false
           generate_release_notes: true
           name: Sightline Desktop ${{ github.ref_name }}
+          body: |
+            Desktop build of Sightline (Windows + Linux).
+
+            - **Windows** — download `Sightline-Setup-*.exe`, run it. Unsigned, so
+              Windows SmartScreen shows a warning → *More info → Run anyway*.
+            - **Linux** — `Sightline-*.AppImage` (mark executable, double-click) or
+              the `.deb`.
+
+            The agent Start/Stop controls appear under **Scrims → Scrim importer**
+            on Windows.
