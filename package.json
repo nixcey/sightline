@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "check": "node scripts/check.mjs",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create sightline",
     "db:local": "wrangler d1 migrations apply sightline --local",

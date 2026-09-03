@@ -52,16 +52,42 @@ First run: the app shows a **"create the owner account"** screen (only available
 while the users table is empty). After that it's the normal sign-in screen.
 New team → optionally seeded with a sample roster (team XPE).
 
-## Deploy to Cloudflare
+## Deploy
+
+**Automatic** — pushing to `main` runs `.github/workflows/deploy.yml`: it runs
+`npm run check` (syntax + view render + parser), then applies D1 migrations, then
+`wrangler deploy`. Pull requests run `check` only. Nothing else is automatic —
+GitHub is otherwise unconnected to Cloudflare.
+
+**Manual** (from a machine with wrangler auth):
 
 ```bash
-npm run db:remote                  # apply migrations to the production D1 db
-npm run deploy                     # publishes the Worker + assets
+npm run check
+npm run db:remote                  # apply migrations to production D1
+npm run deploy                     # publish the Worker + assets
 ```
 
-The Worker is served at `https://sightline.<your-subdomain>.workers.dev` (or a
-custom route you configure in `wrangler.toml`). Everything is on Cloudflare's
-free tier at this scale.
+Live at `https://sightline.nixcey.com` (Workers Custom Domain; `wrangler.toml`
+has the `account_id`, `database_id` and route). Cloudflare free tier covers this.
+
+### CI secret
+
+The Action needs one repo secret — **`CLOUDFLARE_API_TOKEN`**
+(GitHub repo → Settings → Secrets and variables → Actions → New repository
+secret). Create it as a **Custom Token** at
+[dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens):
+
+| Type | Resource | Permission |
+|---|---|---|
+| Account | Workers Scripts | Edit |
+| Account | Cloudflare D1 | Edit |
+| Zone | Zone | Read |
+| Zone | Workers Routes | Edit |
+| Zone | DNS | Edit |
+
+Account Resources → your account · Zone Resources → **only** `nixcey.com`.
+(Or use Cloudflare's *"Edit Cloudflare Workers"* template and scope its zone to
+`nixcey.com`.) The account ID is not secret and is already in `wrangler.toml`.
 
 ## Rank sync
 

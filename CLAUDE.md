@@ -34,9 +34,14 @@ companion app.
 npm install
 npx wrangler login                    # or set CLOUDFLARE_API_TOKEN
 npm run db:local && npm run dev        # http://localhost:8787
+npm run check                         # syntax + view render + parser (CI runs this)
 npm run db:remote && npm run deploy    # production
 ```
 D1 `database_id` and the custom-domain route are in `wrangler.toml`.
+**Push to `main` auto-deploys** via `.github/workflows/deploy.yml`
+(check → migrate → deploy). Needs the `CLOUDFLARE_API_TOKEN` repo secret.
+Keep `npm run check` green — add cases to `scripts/check.mjs` when you add views
+or change the import parser.
 
 ## Testing without Cloudflare
 - `node --check` every changed `.js`.
