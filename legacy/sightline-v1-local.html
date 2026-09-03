@@ -1,0 +1,1498 @@
+<title>Sightline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ============ tokens ============ */
+:root{
+  --bg:#F2EFEA;
+  --bg-grain:#ECE8E1;
+  --surface:#FBFAF7;
+  --surface-2:#F4F1EB;
+  --rail-bg:#171A1F;
+  --rail-ink:#E9E7E2;
+  --rail-dim:#8A8F98;
+  --rail-line:#2A2E35;
+  --ink:#1B1E22;
+  --ink-2:#4C5158;
+  --ink-3:#7B818A;
+  --border:#D9D4CB;
+  --border-2:#C8C2B6;
+  --accent:#FF4655;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#FCE1E3;
+  --good:#12897B;
+  --good-soft:#D2ECE7;
+  --warn:#B26B00;
+  --warn-soft:#F6E6CC;
+  --crit:#C6353F;
+  --crit-soft:#F6D8D9;
+  --free-0:transparent;
+  --free-1:rgba(18,137,123,.14);
+  --free-2:rgba(18,137,123,.30);
+  --free-3:rgba(18,137,123,.52);
+  --shadow:0 1px 2px rgba(20,20,25,.06),0 8px 24px -12px rgba(20,20,25,.14);
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --disp:'Chakra Petch','IBM Plex Sans',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#101215;
+    --bg-grain:#14171B;
+    --surface:#191C21;
+    --surface-2:#1F232A;
+    --rail-bg:#0C0E11;
+    --rail-ink:#E9E7E2;
+    --rail-dim:#767C86;
+    --rail-line:#20242B;
+    --ink:#E7E5E0;
+    --ink-2:#AEB3BB;
+    --ink-3:#7C828C;
+    --border:#2A2F37;
+    --border-2:#363C45;
+    --accent:#FF4655;
+    --accent-ink:#160B0C;
+    --accent-soft:#3A1C1F;
+    --good:#3AD1BF;
+    --good-soft:#123531;
+    --warn:#E7A343;
+    --warn-soft:#3A2C13;
+    --crit:#F0656E;
+    --crit-soft:#3A1D20;
+    --free-1:rgba(58,209,191,.12);
+    --free-2:rgba(58,209,191,.24);
+    --free-3:rgba(58,209,191,.42);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101215;--bg-grain:#14171B;--surface:#191C21;--surface-2:#1F232A;
+  --rail-bg:#0C0E11;--rail-ink:#E9E7E2;--rail-dim:#767C86;--rail-line:#20242B;
+  --ink:#E7E5E0;--ink-2:#AEB3BB;--ink-3:#7C828C;--border:#2A2F37;--border-2:#363C45;
+  --accent:#FF4655;--accent-ink:#160B0C;--accent-soft:#3A1C1F;
+  --good:#3AD1BF;--good-soft:#123531;--warn:#E7A343;--warn-soft:#3A2C13;--crit:#F0656E;--crit-soft:#3A1D20;
+  --free-1:rgba(58,209,191,.12);--free-2:rgba(58,209,191,.24);--free-3:rgba(58,209,191,.42);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  background-image:radial-gradient(var(--bg-grain) 1px,transparent 1px);background-size:4px 4px}
+h1,h2,h3,h4{font-family:var(--disp);font-weight:600;margin:0;letter-spacing:.01em;text-wrap:balance}
+a{color:inherit}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent);color:var(--accent-ink)}
+
+/* ============ shell ============ */
+.app{display:grid;grid-template-columns:214px 1fr;min-height:100vh}
+.rail{background:var(--rail-bg);color:var(--rail-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;border-right:1px solid var(--rail-line)}
+.brand{padding:18px 16px 14px;border-bottom:1px solid var(--rail-line)}
+.brand .mark{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:.16em;display:flex;align-items:center;gap:8px}
+.brand .mark::before{content:"";width:10px;height:16px;background:var(--accent);
+  clip-path:polygon(0 0,100% 0,100% 70%,60% 100%,0 100%)}
+.brand .sub{font-size:10px;letter-spacing:.28em;color:var(--rail-dim);text-transform:uppercase;margin-top:4px;padding-left:18px}
+.teamsel{padding:12px 12px 10px;border-bottom:1px solid var(--rail-line)}
+.teamsel label{font-size:9px;letter-spacing:.22em;color:var(--rail-dim);text-transform:uppercase}
+.teamsel select{width:100%;margin-top:5px;background:#000;color:var(--rail-ink);border:1px solid var(--rail-line);
+  padding:7px 8px;font-family:var(--disp);font-size:13px;letter-spacing:.04em;border-radius:2px}
+.nav{padding:8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;color:var(--rail-dim);
+  padding:9px 10px;font-size:12.5px;letter-spacing:.04em;cursor:pointer;border-radius:2px;text-align:left;
+  font-family:var(--disp);font-weight:500;text-transform:uppercase}
+.nav button svg{width:17px;height:17px;flex:none}
+.nav button:hover{color:var(--rail-ink);background:rgba(255,255,255,.04)}
+.nav button.on{color:var(--rail-ink);background:rgba(255,70,85,.12);box-shadow:inset 2px 0 0 var(--accent)}
+.railfoot{padding:10px 12px;border-top:1px solid var(--rail-line);display:flex;gap:6px;flex-wrap:wrap}
+.railfoot button{flex:1 1 40%;background:none;border:1px solid var(--rail-line);color:var(--rail-dim);padding:6px;
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border-radius:2px;font-family:var(--disp)}
+.railfoot button:hover{color:var(--rail-ink);border-color:var(--rail-dim)}
+
+.stage{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;
+  background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+.topbar .tt{display:flex;flex-direction:column;gap:2px}
+.topbar h1{font-size:20px;letter-spacing:.03em}
+.topbar .crumb{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3)}
+.weekpick{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
+.weekpick button{background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2);width:26px;height:26px;
+  cursor:pointer;border-radius:2px;font-size:13px}
+.weekpick button:hover{border-color:var(--accent);color:var(--accent)}
+.weekpick .lbl{min-width:150px;text-align:center;letter-spacing:.02em}
+.tourpill{display:flex;align-items:center;gap:6px;font-family:var(--disp);font-size:11px;text-transform:uppercase;
+  letter-spacing:.08em;border:1px solid var(--border);padding:5px 9px;border-radius:2px;cursor:pointer;background:var(--surface-2);color:var(--ink-2)}
+.tourpill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+main{padding:24px;max-width:1200px;width:100%}
+
+/* ============ primitives ============ */
+.grid{display:grid;gap:16px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:3px;box-shadow:var(--shadow)}
+.panel.pad{padding:18px}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.panel-h h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.panel-h .hint{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.panel-b{padding:16px}
+.eyebrow{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px;font-family:var(--disp)}
+
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);
+  padding:8px 14px;font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;border-radius:2px}
+.btn:hover{filter:brightness(1.06)}
+.btn.ghost{background:none;color:var(--ink-2);border-color:var(--border-2)}
+.btn.ghost:hover{color:var(--accent);border-color:var(--accent);filter:none}
+.btn.sm{padding:5px 9px;font-size:10px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.icar{background:none;border:1px solid var(--border);color:var(--ink-3);width:26px;height:26px;border-radius:2px;
+  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
+.icar:hover{border-color:var(--accent);color:var(--accent)}
+
+.chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--disp);font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:2px;background:var(--surface-2);
+  color:var(--ink-2);border:1px solid var(--border)}
+.chip.accent{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.chip.good{background:var(--good-soft);color:var(--good);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-family:var(--disp);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+  text-align:left;padding:9px 10px;border-bottom:1px solid var(--border-2);white-space:nowrap}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.tbl-wrap{overflow-x:auto}
+
+.stat{display:flex;flex-direction:column;gap:3px}
+.stat .k{font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3)}
+.stat .v{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.01em}
+.stat .v small{font-size:13px;color:var(--ink-3);font-weight:500}
+.stat .d{font-family:var(--mono);font-size:11px}
+.up{color:var(--good)}.down{color:var(--crit)}.flat{color:var(--ink-3)}
+
+.bar{height:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--accent)}
+.bar > i.good{background:var(--good)}
+
+.p111{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.p22{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.p31{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+@media(max-width:900px){.p111,.p22,.p31{grid-template-columns:1fr}}
+
+.cut{clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
+
+.pcard{border:1px solid var(--border);border-radius:3px;background:var(--surface);padding:14px;display:flex;flex-direction:column;gap:10px}
+.pcard .top{display:flex;align-items:center;gap:10px}
+.pcard .ico{width:34px;height:34px;display:grid;place-items:center;font-size:18px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:2px;flex:none}
+.pcard .hd{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.02em}
+.pcard .rl{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--disp)}
+.pcard .agents{display:flex;gap:4px;flex-wrap:wrap}
+
+.empty{padding:34px;text-align:center;color:var(--ink-3);font-size:13px}
+.callout{border:1px solid var(--border);border-left:3px solid var(--accent);background:var(--surface-2);padding:12px 14px;border-radius:2px;font-size:13px}
+.callout.good{border-left-color:var(--good)}
+.callout.warn{border-left-color:var(--warn)}
+
+/* schedule grid */
+.sgrid{display:grid;grid-template-columns:56px repeat(7,1fr);font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:3px;overflow:hidden}
+.sgrid .hcell{background:var(--surface-2);padding:6px 4px;text-align:center;font-family:var(--disp);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--border-2)}
+.sgrid .tcell{padding:2px 5px;text-align:right;color:var(--ink-3);border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.sgrid .cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:15px;position:relative}
+.sgrid .cell.f1{background:var(--free-1)}
+.sgrid .cell.f2{background:var(--free-2)}
+.sgrid .cell.f3{background:var(--free-3)}
+.sgrid .cell.win{box-shadow:inset 2px 0 0 var(--good),inset -2px 0 0 var(--good)}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,10,12,.55);display:grid;place-items:center;z-index:50;padding:20px}
+.modal{background:var(--surface);border:1px solid var(--border-2);border-radius:4px;max-width:540px;width:100%;
+  max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+.modal-h h3{font-size:13px;letter-spacing:.14em;text-transform:uppercase}
+.modal-b{padding:18px;display:flex;flex-direction:column;gap:14px}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-family:var(--disp);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.fld input,.fld select,.fld textarea{background:var(--surface-2);border:1px solid var(--border-2);color:var(--ink);
+  padding:8px 10px;font-family:var(--sans);font-size:13px;border-radius:2px;width:100%}
+.fld textarea{min-height:70px;resize:vertical}
+.fld .hint{font-size:11px;color:var(--ink-3)}
+.fld.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.checks label{display:inline-flex;align-items:center;gap:5px;font-size:11px;text-transform:none;letter-spacing:0;
+  border:1px solid var(--border-2);padding:5px 8px;border-radius:2px;cursor:pointer;font-family:var(--sans);color:var(--ink-2)}
+.checks label.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.checks input{display:none}
+.modal-f{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--surface)}
+
+#toast-root{position:fixed;right:18px;bottom:18px;z-index:80;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:3px;font-size:12px;font-family:var(--disp);
+  letter-spacing:.04em;box-shadow:var(--shadow);animation:tin .2s ease}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+
+.sub{color:var(--ink-3);font-size:12px}
+.mono{font-family:var(--mono)}
+.spark{display:block}
+.rowline{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.rowline:last-child{border-bottom:0}
+
+@media(max-width:760px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:column}
+  .nav{flex-direction:row;overflow-x:auto;flex-wrap:nowrap}
+  .nav button{flex:none;white-space:nowrap}
+  main{padding:16px}
+  .topbar{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+
+<div class="app">
+  <nav class="rail">
+    <div class="brand">
+      <div class="mark">SIGHTLINE</div>
+      <div class="sub">ops deck</div>
+    </div>
+    <div class="teamsel">
+      <label for="teamSelect">Active roster</label>
+      <select id="teamSelect"></select>
+    </div>
+    <div class="nav" id="nav"></div>
+    <div class="railfoot">
+      <button id="btnTheme">Theme</button>
+      <button id="btnExport">Export</button>
+      <button id="btnImport">Import</button>
+      <button id="btnReset">Reset</button>
+      <input type="file" id="fileImport" accept="application/json" hidden>
+    </div>
+  </nav>
+  <div class="stage">
+    <header class="topbar">
+      <div class="tt">
+        <div class="crumb" id="crumb">Overview</div>
+        <h1 id="viewTitle">Overview</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <button class="tourpill" id="tourPill">◆ Tournament week</button>
+        <div class="weekpick">
+          <button id="wkPrev" aria-label="Previous week">‹</button>
+          <span class="lbl" id="wkLabel">—</span>
+          <button id="wkNext" aria-label="Next week">›</button>
+        </div>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+/* ============================================================ constants */
+const AGENTS=["Astra","Breach","Brimstone","Chamber","Clove","Cypher","Deadlock","Fade","Gekko","Harbor","Iso","Jett","KAY/O","Killjoy","Neon","Omen","Phoenix","Raze","Reyna","Sage","Skye","Sova","Tejo","Viper","Vyse","Waylay","Yoru"];
+const MAPS=["Abyss","Ascent","Bind","Breeze","Fracture","Haven","Icebox","Lotus","Pearl","Split","Sunset"];
+const ROLES=["Duelist","Initiator","Controller","Sentinel","Flex","IGL"];
+const STATUS=["Starter","Sub","Trial","Inactive"];
+const VERDICTS=["Shortlist","Hold","Pass","Signed"];
+const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const RANK_TIERS=["Iron","Bronze","Silver","Gold","Platinum","Diamond","Ascendant","Immortal","Radiant"];
+const KEY="sightline.db.v2";
+const RATING_BASELINE=1.00; // R2.0: 1.00 ≈ an average player
+
+/* ============================================================ helpers */
+const $=(s,r=document)=>r.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const mean=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+const iso=d=>d.toISOString().slice(0,10);
+const parse=s=>{const d=new Date(s+"T00:00:00");return d;};
+function mondayOf(d){const x=new Date(d);const g=(x.getDay()+6)%7;x.setDate(x.getDate()-g);x.setHours(0,0,0,0);return x;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function fmtRange(mon){const end=addDays(mon,6);const o={month:"short",day:"numeric"};
+  return mon.toLocaleDateString(undefined,o)+" – "+end.toLocaleDateString(undefined,o)+" "+end.getFullYear();}
+function monthKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+function monthLabel(k){const[y,m]=k.split("-");return new Date(y,m-1,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});}
+const t2m=t=>{const[h,m]=t.split(":").map(Number);return h*60+m;};
+const m2t=m=>String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+/* rank as a continuous scale: 3 units per tier (one per division), + RR/100 within a division */
+function rankUnits(r){
+  if(!r)return 0;
+  if(r.tier==="Radiant")return 24+(r.rr||0)/100;
+  return RANK_TIERS.indexOf(r.tier)*3+((r.div||1)-1)+(r.rr||0)/100;
+}
+function unitsToRank(u){
+  u=clamp(u,0,24.999);
+  if(u>=24)return {tier:"Radiant",div:1,rr:Math.round((u-24)*100)};
+  const idx=Math.floor(u);
+  return {tier:RANK_TIERS[Math.floor(idx/3)],div:idx%3+1,rr:Math.round((u-idx)*100)};
+}
+function rankStr(r){return !r?"—":r.tier==="Radiant"?"Radiant":`${r.tier} ${r.div}`;}
+function rankShort(r){return rankStr(r).replace("Immortal","Imm").replace("Ascendant","Asc").replace("Diamond","Dia").replace("Platinum","Plat").replace("Radiant","Rad");}
+function fmtRank(r){return !r?"—":rankStr(r)+((r.tier==="Radiant"&&!r.rr)?"":` · ${r.rr||0} RR`);}
+function avgRank(ranks){const v=(ranks||[]).filter(Boolean);return v.length?unitsToRank(mean(v.map(rankUnits))):null;}
+
+/* estimators for when a scrim row is missing ADR / KAST (manual entry without a tracker) */
+const estADR=kpr=>Math.round(clamp(40+kpr*145,45,260));
+const estKAST=(kpr,dpr)=>Math.round(clamp(100*(0.55+kpr*0.32-dpr*0.24),35,95));
+/* HLTV Rating 2.0 — community-derived coefficients (kast 0-100, adr per round),
+   recentred for Valorant's higher ADR scale so a league-average game ≈ 1.00. */
+function rating20(k,d,a,rounds,adr,kast){
+  if(!rounds)return null;
+  const kpr=k/rounds,dpr=d/rounds,apr=a/rounds;
+  if(adr==null)adr=estADR(kpr);
+  if(kast==null)kast=estKAST(kpr,dpr);
+  const impact=2.13*kpr+0.42*apr-0.41;
+  const raw=0.0073*kast+0.3591*kpr-0.5329*dpr+0.2372*impact+0.0032*adr+0.1587;
+  return raw-0.27;
+}
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function agoShort(ts){if(!ts)return"";const s=(Date.now()-ts)/1000;
+  if(s<90)return"just now";if(s<5400)return Math.round(s/60)+"m ago";
+  if(s<172800)return Math.round(s/3600)+"h ago";return Math.round(s/86400)+"d ago";}
+
+/* "Immortal 1" / "Radiant" / "Unrated" (+ RR) -> {tier,div,rr} | null */
+function parseRankName(s,rr){
+  if(!s||/unrated|unranked/i.test(s))return null;
+  if(/radiant/i.test(s))return {tier:"Radiant",div:1,rr:rr||0};
+  const m=String(s).match(/([A-Za-z]+)\s*([123])/);
+  if(!m)return null;
+  const tier=RANK_TIERS.find(t=>t.toLowerCase()===m[1].toLowerCase());
+  return tier?{tier,div:+m[2],rr:rr||0}:null;
+}
+
+/* ---- rank provider ----------------------------------------------------------
+   Pulls a player's live competitive rank from their Riot ID.
+   tracker.gg's own API and Riot's official API can't be called from a static
+   page (no CORS, bot protection, no public "current rank by Riot ID" endpoint).
+   This uses the community HenrikDev Valorant API, which is CORS-enabled and
+   takes a free key (register in their Discord). When a backend is added, move
+   this fetch server-side and keep the key there. */
+const RankProvider={
+  regionFor:server=>({EU:"eu",NA:"na",APAC:"ap",BR:"br",LATAM:"latam",KR:"kr"}[server]||"eu"),
+  async fetchRank({name,tag},region,key){
+    const url=`https://api.henrikdev.xyz/valorant/v3/mmr/${region}/pc/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+    let res;
+    try{res=await fetch(url,{headers:key?{Authorization:key}:{}});}
+    catch(e){throw new Error("network/CORS blocked — serve over http, not file://");}
+    if(res.status===404)throw new Error("Riot ID not found");
+    if(res.status===401||res.status===403)throw new Error("API key missing or invalid");
+    if(res.status===429)throw new Error("rate limited — wait a minute");
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const j=await res.json().catch(()=>null);
+    const cur=(j&&j.data&&(j.data.current||j.data.current_data))||{};
+    const tierName=(cur.tier&&cur.tier.name)||cur.currenttierpatched;
+    const rr=(cur.rr!=null?cur.rr:cur.ranking_in_tier)||0;
+    return parseRankName(tierName,rr);
+  }
+};
+let _syncErr="";
+async function syncRanks(only){
+  if(state.syncing)return;
+  const t=team();
+  const key=(t.rankApiKey||"").trim();
+  const targets=(only?[only]:t.roster).filter(p=>p.riotId&&p.riotId.name&&p.riotId.tag);
+  if(!targets.length){toast(only?"Add a Riot ID for this player first":"No Riot IDs on the roster — edit a player to add one");return;}
+  state.syncing=true;_syncErr="";render();
+  let done=0,fail=0;
+  for(const p of targets){
+    const region=(p.riotId.region||RankProvider.regionFor(t.server));
+    try{
+      const r=await RankProvider.fetchRank(p.riotId,region,key);
+      if(r){p.rank=r;p.rankSyncedAt=Date.now();done++;}
+      else{fail++;_syncErr="unrated";}
+    }catch(e){fail++;_syncErr=e.message;}
+    await sleep(320);
+  }
+  state.syncing=false;save();render();
+  toast(`Ranks synced ${done}/${targets.length}`+(fail?` · ${fail} failed (${_syncErr})`:""));
+}
+function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;
+  $("#toast-root").appendChild(el);setTimeout(()=>el.remove(),2200);}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+/* ============================================================ seed */
+function seed(){
+  const R=(tier,div,rr)=>({tier,div,rr});
+  const P=(handle,name,role,agents,status,icon,joined,rank,riot)=>({id:uid(),handle,name,role,agents,status,icon,joined,rank,riotId:riot,note:""});
+  const roster=[
+    P("nix","Ravi Okafor","IGL","Killjoy,Cypher,Chamber".split(","),"Starter","🧭","2025-11-02",R("Immortal",1,55),{name:"nix",tag:"EUW",region:""}),
+    P("Sable","Lea Novak","Duelist","Jett,Raze,Neon".split(","),"Starter","🗡️","2025-11-02",R("Immortal",2,25),{name:"Sable",tag:"EUW",region:""}),
+    P("Koda","Marc Delgado","Controller","Omen,Brimstone,Astra".split(","),"Starter","🌫️","2025-12-10",R("Immortal",1,8),{name:"Koda",tag:"EU1",region:""}),
+    P("Riven","Amara Sy","Initiator","Sova,Fade,Gekko".split(","),"Starter","📡","2025-11-20",R("Immortal",1,68),{name:"Riven",tag:"EUW",region:""}),
+    P("Tython","Jonas Pell","Flex","Chamber,KAY/O,Skye".split(","),"Starter","♻️","2026-01-15",R("Ascendant",3,78),{name:"Tython",tag:"EU2",region:""}),
+    P("Mireu","Sun-woo Park","Duelist","Reyna,Phoenix,Jett".split(","),"Sub","🔁","2026-02-01",R("Immortal",1,5),{name:"Mireu",tag:"KR1",region:"kr"}),
+  ];
+  const id=h=>roster.find(p=>p.handle===h).id;
+  const S=(date,opp,map,rw,rl,lineup)=>{
+    const rounds=rw+rl;
+    return {id:uid(),date,opp,map,rw,rl,
+      lineup:lineup.map(([h,agent,k,d,a])=>{
+        const kpr=k/rounds,dpr=d/rounds;
+        return {pid:id(h),agent,k,d,a,adr:estADR(kpr),kast:estKAST(kpr,dpr),present:true};
+      })};
+  };
+  const scrims=[
+    S("2026-07-28","Onyx","Ascent",13,9,[["nix","Killjoy",14,13,9],["Sable","Jett",22,15,4],["Koda","Omen",16,14,7],["Riven","Sova",13,12,11],["Tython","KAY/O",15,13,8]]),
+    S("2026-07-31","DustWolves","Lotus",11,13,[["nix","Cypher",12,16,7],["Sable","Raze",19,17,5],["Koda","Astra",11,17,9],["Riven","Fade",14,15,8],["Tython","Skye",13,16,10]]),
+    S("2026-08-05","Meridian","Sunset",13,7,[["nix","Chamber",17,10,6],["Sable","Jett",24,11,3],["Koda","Omen",15,10,9],["Riven","Sova",14,9,12],["Tython","KAY/O",16,11,7]]),
+    S("2026-08-09","Kestrel","Bind",13,11,[["nix","Cypher",15,14,8],["Sable","Raze",21,16,5],["Koda","Brimstone",12,15,10],["Riven","Gekko",16,13,9],["Tython","Skye",14,14,9]]),
+    S("2026-08-14","Onyx","Haven",8,13,[["nix","Killjoy",11,17,6],["Sable","Jett",18,18,3],["Koda","Omen",9,18,7],["Riven","Fade",12,16,8],["Tython","KAY/O",13,17,6]]),
+    S("2026-08-19","Vantage","Ascent",13,10,[["nix","Killjoy",16,13,10],["Sable","Neon",23,14,4],["Koda","Omen",13,14,8],["Riven","Sova",15,12,13],["Tython","Chamber",17,12,6]]),
+    S("2026-08-25","Meridian","Lotus",13,6,[["nix","Cypher",18,8,7],["Sable","Raze",22,9,6],["Koda","Astra",14,9,11],["Riven","Fade",16,8,12],["Tython","Skye",15,10,9]]),
+    S("2026-08-29","Kestrel","Sunset",10,13,[["nix","Chamber",13,16,5],["Sable","Jett",20,17,3],["Koda","Omen",8,17,6],["Riven","Sova",13,15,9],["Tython","KAY/O",12,16,7]]),
+    S("2026-09-02","Vantage","Split",13,9,[["nix","Cypher",16,12,9],["Sable","Raze",21,13,5],["Koda","Brimstone",10,15,9],["Riven","Fade",17,11,11],["Tython","KAY/O",16,12,8]]),
+  ];
+  const snap=(date,note,m)=>({id:uid(),date,note,ranks:Object.fromEntries(Object.entries(m).map(([h,r])=>[id(h),r]))});
+  const rankSnapshots=[
+    snap("2026-07-06","Post-bootcamp reset",{nix:R("Ascendant",3,35),Sable:R("Immortal",1,5),Koda:R("Ascendant",3,50),Riven:R("Ascendant",3,60),Tython:R("Ascendant",2,55),Mireu:R("Ascendant",3,15)}),
+    snap("2026-07-20","Consistent scrim wins",{nix:R("Ascendant",3,80),Sable:R("Immortal",1,45),Koda:R("Ascendant",3,70),Riven:R("Immortal",1,10),Tython:R("Ascendant",3,20),Mireu:R("Ascendant",3,60)}),
+    snap("2026-08-03","Broke into Immortal",{nix:R("Immortal",1,25),Sable:R("Immortal",1,85),Koda:R("Immortal",1,5),Riven:R("Immortal",1,35),Tython:R("Ascendant",3,55),Mireu:R("Immortal",1,0)}),
+    snap("2026-08-17","Rough fortnight, Haven losses",{nix:R("Immortal",1,15),Sable:R("Immortal",1,70),Koda:R("Ascendant",3,80),Riven:R("Immortal",1,20),Tython:R("Ascendant",3,40),Mireu:R("Ascendant",3,75)}),
+    snap("2026-08-31","Recovered form pre-qualifier",{nix:R("Immortal",1,50),Sable:R("Immortal",2,15),Koda:R("Immortal",1,5),Riven:R("Immortal",1,60),Tython:R("Ascendant",3,70),Mireu:R("Immortal",1,2)}),
+  ];
+  const T=(handle,role,tier,div,agents,mech,util,comms,att,verdict,notes)=>({id:uid(),date:"2026-08-20",handle,role,tier,div,agents:agents.split(","),
+    scores:{mech,util,comms,att},verdict,notes});
+  const tryouts=[
+    T("Ares","Duelist","Immortal",2,"Jett,Raze",9,6,6,7,"Shortlist","Elite aim, wide peeks. Tilts after a lost round, comms drop off. Coachable ego."),
+    T("Nova","Controller","Immortal",1,"Omen,Astra,Harbor",6,9,9,9,"Shortlist","Smoke timings are pro-level, positive energy, great VOD notes. Slightly passive in retakes."),
+    T("Kestrel","Sentinel","Ascendant",3,"Killjoy,Cypher",6,7,6,5,"Pass","Reliable anchor but low mechanical ceiling and pushed back on feedback twice."),
+    T("Juno","Initiator","Immortal",2,"Sova,Fade,Gekko",8,8,7,8,"Hold","Fast recon reads, flexes roles well. Uni schedule conflicts Tue/Thu evenings."),
+    T("Rell","Flex","Immortal",3,"Omen,KAY/O,Chamber,Killjoy",8,8,8,9,"Shortlist","Best all-round tryout so far. Wants shot-calling reps — would overlap with nix."),
+  ];
+  const busy=(h,day,start,end,label)=>({id:uid(),pid:id(h),day,start,end,label});
+  const blocks=[
+    busy("nix",0,"13:00","15:00","Lecture"),busy("nix",2,"13:00","15:00","Lecture"),busy("nix",3,"18:00","19:30","Gym"),
+    busy("Sable",1,"09:00","12:00","Class"),busy("Sable",3,"09:00","12:00","Class"),busy("Sable",4,"16:00","18:00","Work"),
+    busy("Koda",0,"17:00","20:00","Work shift"),busy("Koda",2,"17:00","20:00","Work shift"),busy("Koda",5,"12:00","16:00","Work shift"),
+    busy("Riven",1,"14:00","17:00","Lab"),busy("Riven",4,"14:00","16:00","Seminar"),
+    busy("Tython",0,"09:00","11:00","Class"),busy("Tython",2,"09:00","11:00","Class"),busy("Tython",4,"09:00","11:00","Class"),busy("Tython",3,"20:00","21:30","Family"),
+  ];
+  const wkKey=iso(mondayOf(new Date("2026-09-03")));
+  const week={};DAYS.forEach(d=>week[d]=[]);
+  week.Mon=[{id:uid(),time:"19:00",title:"VOD review — Kestrel losses",type:"Review"},{id:uid(),time:"20:30",title:"Scrim vs Vantage (BO2)",type:"Scrim"}];
+  week.Tue=[{id:uid(),time:"19:00",title:"Individual role practice",type:"Practice"}];
+  week.Wed=[{id:uid(),time:"20:00",title:"Scrim vs Onyx (BO2)",type:"Scrim"}];
+  week.Thu=[{id:uid(),time:"19:00",title:"Comp theory — Split defense",type:"Theory"}];
+  week.Fri=[{id:uid(),time:"20:00",title:"Scrim vs Meridian (BO3)",type:"Scrim"}];
+  week.Sat=[{id:uid(),time:"15:00",title:"Watch party — Champions groups",type:"Team"}];
+  week.Sun=[{id:uid(),time:"18:00",title:"Week debrief + set next targets",type:"Review"}];
+  const months={
+    "2026-09":{theme:"Qualifier prep — lock Ascent + Split, fix Haven",goals:[
+      {text:"3 scrim blocks/week, 2 map pool focus",done:false},
+      {text:"Haven win rate above 45% in scrims",done:false},
+      {text:"Sign one flex/initiator sub from tryouts",done:false},
+      {text:"Reach Immortal 2 team rank",done:false}]},
+    "2026-10":{theme:"Open Qualifier — peak and stabilize rotations",goals:[
+      {text:"Reduce mid-round deaths (deaths in first 15s)",done:false},
+      {text:"Full 7-map pool tournament-ready",done:false}]},
+  };
+  return {activeTeamId:null,teams:[{
+    id:uid(),name:"XPE",tag:"XPE",server:"EU",rankApiKey:"",
+    scrimGoal:{base:1,tournament:3},tournamentWeeks:[wkKey],
+    roster,scrims,rankSnapshots,tryouts,
+    schedule:{winStart:"11:00",winEnd:"24:00",includeSubs:false,blocks},
+    activities:{weeks:{[wkKey]:week},months}
+  }]};
+}
+
+/* ============================================================ store
+   Single boundary for persistence. Today: browser localStorage.
+   To move to a backend later (e.g. auto-logging scrims via the Overwolf API),
+   replace Store.read / Store.write with fetch() calls to your API and make
+   load()/save() await them — no view code touches storage directly. */
+const Store={
+  read(){try{return JSON.parse(localStorage.getItem(KEY));}catch(e){return null;}},
+  write(db){try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch(e){return false;}},
+};
+let DB=load();
+function load(){const r=Store.read();
+  if(r&&r.teams&&r.teams.length){if(!r.activeTeamId)r.activeTeamId=r.teams[0].id;return r;}
+  const s=seed();s.activeTeamId=s.teams[0].id;return s;}
+function save(){if(!Store.write(DB))toast("Storage unavailable — export a backup");}
+const team=()=>DB.teams.find(t=>t.id===DB.activeTeamId)||DB.teams[0];
+const P=pid=>team().roster.find(p=>p.id===pid)||{handle:"?",icon:"•"};
+
+/* ============================================================ ui state */
+let state={view:"overview",week:mondayOf(new Date("2026-09-03")),perfWindow:5,complabMap:"Ascent",tryoutSort:"score",syncing:false};
+
+const NAV=[
+  ["overview","Overview",icon("grid")],
+  ["roster","Roster",icon("users")],
+  ["schedule","Schedule",icon("clock")],
+  ["activities","Activities",icon("checks")],
+  ["ranks","Rank Tracking",icon("trend")],
+  ["scrims","Scrims",icon("swords")],
+  ["performance","Performance",icon("pulse")],
+  ["complab","Comp Lab",icon("layers")],
+  ["tryouts","Tryouts",icon("search")],
+];
+function icon(n){const p={
+  grid:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>',
+  users:'<circle cx="9" cy="8" r="3"/><path d="M4 20c0-3 2-5 5-5s5 2 5 5"/><path d="M16 6a3 3 0 0 1 0 6M15 20c0-3 1-4 3-4"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  checks:'<path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3M12 6h8M12 13h8M12 20h8"/>',
+  trend:'<path d="M4 17l6-6 4 4 6-8M16 7h4v4"/>',
+  swords:'<path d="M4 4l9 9M14 14l6 6M20 4l-9 9M10 14l-6 6"/>',
+  pulse:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  layers:'<path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/>',
+  search:'<circle cx="10" cy="10" r="6"/><path d="M20 20l-5-5"/>',
+}[n];return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;}
+
+/* ============================================================ analytics */
+function scrimsInWeek(mon){const a=iso(mon),b=iso(addDays(mon,7));return team().scrims.filter(s=>s.date>=a&&s.date<b);}
+function isTournamentWeek(mon){return team().tournamentWeeks.includes(iso(mon));}
+function weekGoal(mon){const g=team().scrimGoal;return isTournamentWeek(mon)?g.tournament:g.base;}
+
+function scrimRatings(scrim){
+  const rounds=(scrim.rw||0)+(scrim.rl||0);
+  return scrim.lineup.map(l=>{
+    const kpr=rounds?l.k/rounds:0,dpr=rounds?l.d/rounds:0;
+    const adr=l.adr??estADR(kpr), kast=l.kast??estKAST(kpr,dpr);
+    return {...l,adr,kast,kd:l.k/Math.max(l.d,1),
+      rating:rating20(l.k,l.d,l.a,rounds,adr,kast)};
+  });
+}
+function playerRolling(pid,n){
+  const list=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1);
+  const vals=[];
+  for(const s of list){const row=scrimRatings(s).find(r=>r.pid===pid&&r.present);
+    if(row&&row.rating!=null){vals.push({date:s.date,rating:row.rating,kd:row.kd,map:s.map});}
+    if(vals.length>=n)break;}
+  return vals;
+}
+function performanceTable(n){
+  return team().roster.filter(p=>p.status==="Starter"||p.status==="Sub").map(p=>{
+    const cur=playerRolling(p.id,n);
+    const prev=playerRolling(p.id,n*2).slice(n,n*2);
+    const a=mean(cur.map(v=>v.rating));
+    const pv=mean(prev.map(v=>v.rating));
+    const kd=mean(cur.map(v=>v.kd));
+    return {p,games:cur.length,rating:a,prevRating:pv,delta:(a!=null&&pv!=null)?a-pv:null,kd,
+      flag:a!=null&&a<RATING_BASELINE,trend:cur.map(v=>v.rating).reverse()};
+  }).sort((x,y)=>(x.rating??9)-(y.rating??9));
+}
+/* team rank = average of the current roster's live ranks */
+function teamRank(includeSubs){
+  const ps=team().roster.filter(p=>p.status==="Starter"||(includeSubs&&p.status==="Sub"));
+  return avgRank(ps.map(p=>p.rank));
+}
+function attendanceRate(pid,lastN){
+  const list=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,lastN||99);
+  let tot=0,pres=0;list.forEach(s=>{const l=s.lineup.find(x=>x.pid===pid);if(l){tot++;if(l.present)pres++;}});
+  return tot?pres/tot:null;
+}
+function bestAgentsForMap(map){
+  const rows=team().scrims.filter(s=>s.map===map).flatMap(s=>{
+    const rt=scrimRatings(s);const win=s.rw>s.rl;
+    return rt.filter(r=>r.present).map(r=>({pid:r.pid,agent:r.agent,win,rating:r.rating??RATING_BASELINE}));
+  });
+  const byPlayer={};
+  rows.forEach(r=>{
+    byPlayer[r.pid]=byPlayer[r.pid]||{};
+    const a=byPlayer[r.pid][r.agent]=byPlayer[r.pid][r.agent]||{games:0,wins:0,rating:0};
+    a.games++;a.wins+=r.win?1:0;a.rating+=r.rating;
+  });
+  return team().roster.filter(p=>p.status==="Starter").map(p=>{
+    const m=byPlayer[p.id]||{};
+    const opts=Object.entries(m).map(([agent,d])=>({agent,games:d.games,wr:d.wins/d.games,rating:d.rating/d.games}))
+      .sort((a,b)=>(b.wr*.55+b.rating*.225)-(a.wr*.55+a.rating*.225));
+    return {p,opts,best:opts[0]||null};
+  });
+}
+
+/* ============================================================ free-time solver */
+function freeSolve(){
+  const s=team().schedule;
+  const ws=t2m(s.winStart),we=t2m(s.winEnd);
+  const active=team().roster.filter(p=>p.status==="Starter"||(s.includeSubs&&p.status==="Sub"));
+  const step=30;
+  const grid=[];// [day][slotIdx] = freeCount
+  const windows=[];
+  for(let day=0;day<7;day++){
+    grid[day]=[];
+    let runStart=null;
+    for(let m=ws;m<we;m+=step){
+      let free=0;
+      active.forEach(p=>{
+        const busy=s.blocks.some(b=>b.pid===p.id&&b.day===day&&t2m(b.start)<m+step&&t2m(b.end)>m);
+        if(!busy)free++;
+      });
+      grid[day].push(free);
+      const allFree=free===active.length&&active.length>0;
+      if(allFree&&runStart==null)runStart=m;
+      if((!allFree||m+step>=we)&&runStart!=null){
+        const end=allFree?m+step:m;
+        if(end-runStart>=90)windows.push({day,start:runStart,end,mins:end-runStart});
+        runStart=null;
+      }
+    }
+  }
+  return {grid,windows,active,ws,we,step};
+}
+
+/* ============================================================ render */
+function render(){
+  $("#viewTitle").textContent=NAV.find(n=>n[0]===state.view)[1];
+  $("#crumb").textContent=team().name+" · "+NAV.find(n=>n[0]===state.view)[1];
+  $("#wkLabel").textContent=fmtRange(state.week);
+  $("#tourPill").classList.toggle("on",isTournamentWeek(state.week));
+  $("#nav").innerHTML=NAV.map(n=>`<button data-v="${n[0]}" class="${n[0]===state.view?'on':''}">${n[2]}<span>${n[1]}</span></button>`).join("");
+  $("#teamSelect").innerHTML=DB.teams.map(t=>`<option value="${t.id}" ${t.id===DB.activeTeamId?'selected':''}>${esc(t.name)} · ${esc(t.tag)}</option>`).join("")+`<option value="__new">+ New team…</option>`;
+  VIEWS[state.view]();
+}
+const M=$("#main");
+
+/* -------- overview -------- */
+VIEWS_overview=()=>{
+  const mon=state.week, goal=weekGoal(mon), done=scrimsInWeek(mon).length;
+  const perf=performanceTable(state.perfWindow);
+  const flagged=perf.filter(r=>r.flag);
+  const starters=team().roster.filter(p=>p.status==="Starter");
+  const tr=teamRank();
+  const snaps=team().rankSnapshots.slice().sort((a,b)=>a.date<b.date?-1:1);
+  const lastSnap=snaps[snaps.length-1];
+  const prevAvg=lastSnap?avgRank(starters.map(p=>lastSnap.ranks[p.id])):null;
+  const rDelta=(tr&&prevAvg)?rankUnits(tr)-rankUnits(prevAvg):0;
+  const att=(()=>{const list=team().scrims.slice(-5);let tot=0,p=0;list.forEach(s=>s.lineup.forEach(l=>{tot++;if(l.present)p++;}));return tot?p/tot:null;})();
+  const wk=team().activities.weeks[iso(mon)];
+  let nextAct=null;
+  if(wk)for(const d of DAYS){for(const it of (wk[d]||[])){nextAct=nextAct||{d,...it};}}
+  const fs=freeSolve();
+  const recent=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,5);
+
+  M.innerHTML=`
+  <div class="grid">
+    <div class="p111">
+      ${statCard("Scrims this week",`${done}<small>/${goal}</small>`,
+        goal?bar(done/goal):"",isTournamentWeek(mon)?"Tournament cadence":"Standard cadence")}
+      ${statCard("Team rank",tr?rankStr(tr):"—",
+        `<span class="d ${rDelta>0.15?'up':rDelta<-0.15?'down':'flat'}">${rDelta>0.15?'▲':rDelta<-0.15?'▼':'■'} ${tr?tr.rr+' RR':''}</span>`,
+        "Avg of starters' live ranks")}
+      ${statCard("Scrim attendance",att!=null?Math.round(att*100)+"%":"—","","Last 5 scrims, all players")}
+    </div>
+    <div class="p31">
+      <div class="panel">
+        <div class="panel-h"><h3>Focus list</h3><span class="hint">rolling ${state.perfWindow} scrims</span></div>
+        <div class="panel-b">
+          ${flagged.length?flagged.map(r=>`
+            <div class="rowline">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-size:16px">${r.p.icon}</span>
+                <div><div style="font-family:var(--disp);font-weight:600">${esc(r.p.handle)}</div>
+                <div class="sub">${esc(r.p.role)} · avg R2.0 ${r.rating.toFixed(2)}</div></div>
+              </div>
+              <span class="chip crit">Below ${RATING_BASELINE.toFixed(2)}</span>
+            </div>`).join(""):
+            `<div class="callout good">No starter is averaging below ${RATING_BASELINE.toFixed(2)} Rating 2.0 over the last ${state.perfWindow} scrims.</div>`}
+          <div style="margin-top:12px"><button class="btn ghost sm" data-go="performance">Open performance →</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Next up</h3></div>
+        <div class="panel-b">
+          ${nextAct?`<div class="eyebrow">${nextAct.d}</div>
+            <div style="font-family:var(--disp);font-weight:600;font-size:15px">${esc(nextAct.title)}</div>
+            <div class="sub">${nextAct.time} · ${esc(nextAct.type)}</div>`:
+            `<div class="sub">No activities planned this week.</div>`}
+          <div style="margin-top:12px"><button class="btn ghost sm" data-go="activities">Plan week →</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="p22">
+      <div class="panel">
+        <div class="panel-h"><h3>Unified free time</h3><span class="hint">${fs.windows.length} windows ≥ 90m</span></div>
+        <div class="panel-b">
+          ${fs.windows.length?fs.windows.slice(0,5).map(w=>`
+            <div class="rowline"><span class="mono">${DAYS[w.day]} · ${m2t(w.start)}–${m2t(w.end)}</span>
+            <span class="chip good">${Math.floor(w.mins/60)}h${w.mins%60?(w.mins%60)+'m':''}</span></div>`).join(""):
+            `<div class="sub">No shared windows — adjust class blocks or the active window.</div>`}
+          <div style="margin-top:12px"><button class="btn ghost sm" data-go="schedule">Open scheduler →</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Recent scrims</h3></div>
+        <div class="panel-b">
+          ${recent.map(s=>`<div class="rowline">
+            <span class="mono">${s.date.slice(5)} · ${esc(s.map)}</span>
+            <span>vs ${esc(s.opp)} <span class="chip ${s.rw>s.rl?'good':'crit'}">${s.rw}–${s.rl}</span></span>
+          </div>`).join("")}
+          <div style="margin-top:12px"><button class="btn ghost sm" data-go="scrims">Log a scrim →</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Month focus · ${monthLabel(monthKey(mon))}</h3></div>
+      <div class="panel-b">${monthBody(monthKey(mon))}</div>
+    </div>
+  </div>`;
+  M.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.view=b.dataset.go;render();});
+};
+function statCard(k,v,extra,sub){return `<div class="panel pad cut"><div class="stat">
+  <span class="k">${k}</span><span class="v">${v}</span>
+  ${extra||""}
+  ${sub?`<span class="d flat">${sub}</span>`:""}</div></div>`;}
+function bar(f,good){return `<div class="bar"><i class="${good?'good':''}" style="width:${clamp(f*100,0,100)}%"></i></div>`;}
+function monthBody(k){
+  const m=team().activities.months[k];
+  if(!m)return `<div class="sub">No plan for this month. <button class="btn ghost sm" onclick="editMonth('${k}')">Add focus</button></div>`;
+  return `<div class="eyebrow">Theme</div><p style="margin:0 0 12px">${esc(m.theme)}</p>
+    ${m.goals.map((g,i)=>`<div class="rowline"><label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+      <input type="checkbox" ${g.done?'checked':''} onchange="toggleMonthGoal('${k}',${i})"> <span style="${g.done?'text-decoration:line-through;color:var(--ink-3)':''}">${esc(g.text)}</span></label></div>`).join("")}
+    <div style="margin-top:12px"><button class="btn ghost sm" onclick="editMonth('${k}')">Edit month</button></div>`;
+}
+window.toggleMonthGoal=(k,i)=>{team().activities.months[k].goals[i].done=!team().activities.months[k].goals[i].done;save();};
+window.editMonth=(k)=>{
+  const m=team().activities.months[k]||{theme:"",goals:[]};
+  openForm({title:"Month focus · "+monthLabel(k),fields:[
+    {name:"theme",label:"Theme",type:"textarea",value:m.theme},
+    {name:"goals",label:"Goals (one per line)",type:"textarea",value:m.goals.map(g=>g.text).join("\n"),hint:"Checkboxes reset when you rename a goal"},
+  ]},d=>{
+    const old=m.goals||[];
+    team().activities.months[k]={theme:d.theme,goals:d.goals.split("\n").map(s=>s.trim()).filter(Boolean).map(text=>{
+      const prev=old.find(g=>g.text===text);return {text,done:prev?prev.done:false};})};
+    save();render();toast("Month updated");
+  });
+};
+
+/* -------- roster -------- */
+VIEWS_roster=()=>{
+  const r=team().roster;
+  const groups=STATUS.map(st=>[st,r.filter(p=>p.status===st)]).filter(g=>g[1].length);
+  const hasIds=team().roster.some(p=>p.riotId&&p.riotId.name);
+  M.innerHTML=`<div class="grid">
+    <div class="btn-row"><button class="btn" id="addP">${icon('users')} Add player</button>
+    <button class="btn ghost" id="syncAll" ${state.syncing||!hasIds?'disabled':''}>${state.syncing?'Syncing ranks…':'⟳ Sync ranks'}</button>
+    <button class="btn ghost" id="editTeam">Team settings</button></div>
+    ${team().rankApiKey?'':hasIds?`<div class="callout warn">Add a HenrikDev API key in <b>Team settings</b> to enable rank sync.</div>`:''}
+    ${groups.map(([st,ps])=>`
+      <div>
+        <div class="eyebrow">${st} · ${ps.length}</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+          ${ps.map(p=>`<div class="pcard">
+            <div class="top">
+              <div class="ico">${p.icon||'•'}</div>
+              <div style="flex:1"><div class="hd">${esc(p.handle)}</div><div class="rl">${esc(p.role)}</div></div>
+              ${p.riotId&&p.riotId.name?`<button class="icar" data-sync="${p.id}" title="Sync rank from Riot ID" ${state.syncing?'disabled':''}>⟳</button>`:''}
+              <button class="icar" data-edit="${p.id}">✎</button>
+            </div>
+            <div class="sub">${esc(p.name||'—')}${p.riotId&&p.riotId.name?` · <span class="mono">${esc(p.riotId.name+'#'+p.riotId.tag)}</span>`:''}</div>
+            <div class="agents">${(p.agents||[]).map(a=>`<span class="chip">${esc(a)}</span>`).join("")||'<span class="sub">no agent pool</span>'}</div>
+            ${p.note?`<div class="sub" style="border-top:1px solid var(--border);padding-top:8px">${esc(p.note)}</div>`:""}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <span class="chip accent">${fmtRank(p.rank)}</span>
+              ${p.rankSyncedAt?`<span class="sub" style="font-size:10px" title="Rank from sync">⟳ ${agoShort(p.rankSyncedAt)}</span>`:''}
+              <span class="chip">Att ${(()=>{const a=attendanceRate(p.id);return a!=null?Math.round(a*100)+'%':'—';})()}</span>
+              <span class="chip">Since W${weeksSince(p.joined)}</span>
+            </div>
+          </div>`).join("")}
+        </div>
+      </div>`).join("")}
+  </div>`;
+  $("#addP").onclick=()=>editPlayer();
+  $("#editTeam").onclick=editTeamSettings;
+  $("#syncAll").onclick=()=>syncRanks();
+  M.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editPlayer(b.dataset.edit));
+  M.querySelectorAll("[data-sync]").forEach(b=>b.onclick=()=>syncRanks(team().roster.find(p=>p.id===b.dataset.sync)));
+};
+function weeksSince(d){if(!d)return "?";return Math.max(0,Math.round((Date.now()-parse(d))/6048e5));}
+function editPlayer(id){
+  const p=id?team().roster.find(x=>x.id===id):{handle:"",name:"",role:"Duelist",agents:[],status:"Trial",icon:"🎯",joined:iso(new Date()),rank:{tier:"Ascendant",div:1,rr:0},riotId:{name:"",tag:"",region:""},note:""};
+  const rk=p.rank||{tier:"Ascendant",div:1,rr:0};
+  const ri=p.riotId||{name:"",tag:"",region:""};
+  openForm({title:id?"Edit "+p.handle:"Add player",del:id?()=>{team().roster=team().roster.filter(x=>x.id!==id);save();render();toast("Player removed");}:null,fields:[
+    {name:"handle",label:"Handle",type:"text",value:p.handle,required:true},
+    {name:"name",label:"Real name",type:"text",value:p.name},
+    {row:[{name:"role",label:"Role",type:"select",options:ROLES,value:p.role},
+          {name:"status",label:"Status",type:"select",options:STATUS,value:p.status}]},
+    {row:[{name:"icon",label:"Icon",type:"text",value:p.icon,hint:"emoji"},
+          {name:"joined",label:"Joined",type:"date",value:p.joined}]},
+    {row:[{name:"riotName",label:"Riot ID — name",type:"text",value:ri.name,hint:"before the #"},
+          {name:"riotTag",label:"Riot ID — tag",type:"text",value:ri.tag,hint:"after the #"}]},
+    {name:"riotRegion",label:"Account region",type:"select",options:[{v:"",t:"(use team's region)"},{v:"eu",t:"eu"},{v:"na",t:"na"},{v:"ap",t:"ap"},{v:"kr",t:"kr"},{v:"latam",t:"latam"},{v:"br",t:"br"}],value:ri.region||""},
+    {row:[{name:"rtier",label:"Current rank",type:"select",options:RANK_TIERS,value:rk.tier},
+          {name:"rdiv",label:"Division",type:"select",options:[1,2,3],value:rk.div}]},
+    {name:"rrr",label:"RR in division",type:"number",value:rk.rr,min:0,max:100,hint:"Auto-filled by “Sync ranks” when a Riot ID + API key are set"},
+    {name:"agents",label:"Agent pool",type:"multiselect",options:AGENTS,value:p.agents},
+    {name:"note",label:"Notes",type:"textarea",value:p.note},
+  ]},d=>{
+    const rank={tier:d.rtier,div:+d.rdiv,rr:clamp(+d.rrr||0,0,100)};
+    const riotId={name:(d.riotName||"").trim(),tag:(d.riotTag||"").replace(/^#/,"").trim(),region:d.riotRegion||""};
+    ["rtier","rdiv","rrr","riotName","riotTag","riotRegion"].forEach(k=>delete d[k]);
+    if(id)Object.assign(p,d,{rank,riotId});else team().roster.push({id:uid(),...d,rank,riotId});
+    save();render();toast(id?"Player updated":"Player added");
+  });
+}
+function editTeamSettings(){
+  const t=team();
+  openForm({title:"Team settings",fields:[
+    {row:[{name:"name",label:"Team name",type:"text",value:t.name,required:true},
+          {name:"tag",label:"Tag",type:"text",value:t.tag}]},
+    {row:[{name:"server",label:"Server / region",type:"select",options:["EU","NA","APAC","BR","LATAM","KR"],value:t.server},
+          {name:"gbase",label:"Scrim goal / week",type:"number",value:t.scrimGoal.base,min:0}]},
+    {name:"gtour",label:"Scrim goal / tournament week",type:"number",value:t.scrimGoal.tournament,min:0},
+    {name:"rankApiKey",label:"Rank sync API key",type:"text",value:t.rankApiKey||"",hint:"HenrikDev Valorant API key (free — request one in their Discord). Blank = ranks stay manual. Stored in this browser only."},
+  ]},d=>{
+    t.name=d.name;t.tag=d.tag;t.server=d.server;t.scrimGoal={base:+d.gbase,tournament:+d.gtour};
+    t.rankApiKey=(d.rankApiKey||"").trim();
+    save();render();toast("Team saved");
+  });
+}
+
+/* -------- schedule -------- */
+VIEWS_schedule=()=>{
+  const s=team().schedule, fs=freeSolve();
+  const rows=[];
+  for(let m=fs.ws;m<fs.we;m+=fs.step)rows.push(m);
+  M.innerHTML=`<div class="grid">
+    <div class="btn-row">
+      <button class="btn" id="addBlk">${icon('clock')} Add class / busy block</button>
+      <button class="btn ghost" id="winBtn">Active window · ${s.winStart}–${s.winEnd}</button>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" id="subsChk" ${s.includeSubs?'checked':''} style="margin-right:6px">Include subs in overlap</label>
+    </div>
+    <div class="p31">
+      <div class="panel">
+        <div class="panel-h"><h3>Unified availability</h3><span class="hint">green = whole roster free</span></div>
+        <div class="panel-b">
+          <div class="sgrid" style="grid-template-columns:56px repeat(7,1fr)">
+            <div class="hcell"></div>${DAYS.map(d=>`<div class="hcell">${d}</div>`).join("")}
+            ${rows.map((m,ri)=>`<div class="tcell">${m%60===0?m2t(m):''}</div>`+
+              DAYS.map((d,di)=>{
+                const free=fs.grid[di][ri];const active=fs.active.length;
+                const ratio=active?free/active:0;
+                const cls=ratio>=1?'f3':ratio>=.66?'f2':ratio>0?'f1':'';
+                const inWin=fs.windows.some(w=>w.day===di&&m>=w.start&&m<w.end);
+                return `<div class="cell ${cls} ${inWin?'win':''}" title="${DAYS[di]} ${m2t(m)} — ${free}/${active} free"></div>`;
+              }).join("")
+            ).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Scrim slots</h3><span class="hint">≥ 90 min</span></div>
+        <div class="panel-b">
+          ${fs.windows.length?fs.windows.map(w=>`<div class="rowline">
+            <span class="mono">${DAYS[w.day]} ${m2t(w.start)}–${m2t(w.end)}</span>
+            <span class="chip good">${Math.floor(w.mins/60)}h${w.mins%60?(w.mins%60)+'m':''}</span></div>`).join(""):
+            `<div class="sub">No windows. Loosen the active window or trim conflicts.</div>`}
+          <div class="callout" style="margin-top:12px">Active players in overlap: <b>${fs.active.map(p=>p.handle).join(", ")}</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Busy blocks</h3><span class="hint">class · work · commitments</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Player</th><th>Day</th><th>Start</th><th>End</th><th>Label</th><th></th></tr></thead>
+        <tbody>${s.blocks.slice().sort((a,b)=>a.day-b.day||t2m(a.start)-t2m(b.start)).map(b=>`
+          <tr><td>${P(b.pid).icon} ${esc(P(b.pid).handle)}</td><td>${DAYS[b.day]}</td>
+          <td class="mono">${b.start}</td><td class="mono">${b.end}</td><td>${esc(b.label||'')}</td>
+          <td style="text-align:right"><button class="icar" data-delblk="${b.id}">✕</button></td></tr>`).join("")||
+          `<tr><td colspan="6" class="empty">No blocks — everyone always free</td></tr>`}
+        </tbody>
+      </table></div>
+    </div>
+  </div>`;
+  $("#addBlk").onclick=()=>editBlock();
+  $("#subsChk").onchange=e=>{s.includeSubs=e.target.checked;save();render();};
+  $("#winBtn").onclick=()=>{
+    openForm({title:"Active window",fields:[
+      {row:[{name:"winStart",label:"Day starts",type:"text",value:s.winStart,hint:"HH:MM"},
+            {name:"winEnd",label:"Day ends",type:"text",value:s.winEnd,hint:"HH:MM (24:00 ok)"}]}
+    ]},d=>{s.winStart=d.winStart;s.winEnd=d.winEnd;save();render();});
+  };
+  M.querySelectorAll("[data-delblk]").forEach(b=>b.onclick=()=>{s.blocks=s.blocks.filter(x=>x.id!==b.dataset.delblk);save();render();});
+};
+function editBlock(){
+  const s=team().schedule;
+  openForm({title:"Busy block",fields:[
+    {name:"pid",label:"Player",type:"select",options:team().roster.map(p=>({v:p.id,t:p.handle})),value:team().roster[0]?.id},
+    {name:"day",label:"Day",type:"select",options:DAYS.map((d,i)=>({v:i,t:d})),value:0},
+    {row:[{name:"start",label:"Start",type:"text",value:"13:00",hint:"HH:MM"},
+          {name:"end",label:"End",type:"text",value:"15:00",hint:"HH:MM"}]},
+    {name:"label",label:"Label",type:"text",value:"Class"},
+  ]},d=>{s.blocks.push({id:uid(),pid:d.pid,day:+d.day,start:d.start,end:d.end,label:d.label});save();render();toast("Block added");});
+}
+
+/* -------- activities -------- */
+VIEWS_activities=()=>{
+  const key=iso(state.week);
+  const wk=team().activities.weeks[key]||(team().activities.weeks[key]=Object.fromEntries(DAYS.map(d=>[d,[]])));
+  const mk=monthKey(state.week);
+  M.innerHTML=`<div class="grid">
+    <div class="panel">
+      <div class="panel-h"><h3>Week plan · ${fmtRange(state.week)}</h3><span class="hint">${isTournamentWeek(state.week)?'tournament week':'standard week'}</span></div>
+      <div class="panel-b">
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+          ${DAYS.map(d=>`<div class="pcard" style="gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="rl">${d}</span><button class="icar" data-addact="${d}">+</button></div>
+            ${(wk[d]||[]).sort((a,b)=>a.time<b.time?-1:1).map(it=>`
+              <div style="border:1px solid var(--border);border-radius:2px;padding:7px;font-size:12px">
+                <div class="mono" style="font-size:10px;color:var(--ink-3)">${it.time} · ${esc(it.type)}</div>
+                <div>${esc(it.title)}</div>
+                <button class="icar" style="width:20px;height:20px;font-size:10px;margin-top:4px" data-delact="${d}|${it.id}">✕</button>
+              </div>`).join("")||`<div class="sub" style="font-size:11px">—</div>`}
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="p22">
+      <div class="panel">
+        <div class="panel-h"><h3>${monthLabel(mk)}</h3><button class="icar" onclick="editMonth('${mk}')">✎</button></div>
+        <div class="panel-b">${monthBody(mk)}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Month grid</h3><span class="hint">expectations at a glance</span></div>
+        <div class="panel-b">
+          ${Object.keys(team().activities.months).sort().map(k=>{
+            const m=team().activities.months[k];const done=m.goals.filter(g=>g.done).length;
+            return `<div class="rowline"><div><div style="font-family:var(--disp);font-weight:600">${monthLabel(k)}</div>
+              <div class="sub">${esc(m.theme)}</div></div>
+              <span class="chip ${done===m.goals.length&&m.goals.length?'good':'accent'}">${done}/${m.goals.length}</span></div>`;
+          }).join("")}
+          <div style="margin-top:12px"><button class="btn ghost sm" onclick="editMonth('${monthKey(addDays(state.week,32))}')">Add next month →</button></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  M.querySelectorAll("[data-addact]").forEach(b=>b.onclick=()=>{
+    const day=b.dataset.addact;
+    openForm({title:"Activity · "+day,fields:[
+      {row:[{name:"time",label:"Time",type:"text",value:"19:00"},
+            {name:"type",label:"Type",type:"select",options:["Scrim","Review","Practice","Theory","Team","VOD","Tournament","Off"],value:"Scrim"}]},
+      {name:"title",label:"What",type:"text",value:"",required:true},
+    ]},d=>{wk[day].push({id:uid(),...d});save();render();});
+  });
+  M.querySelectorAll("[data-delact]").forEach(b=>b.onclick=()=>{
+    const[day,id]=b.dataset.delact.split("|");wk[day]=wk[day].filter(x=>x.id!==id);save();render();
+  });
+};
+
+/* -------- ranks -------- */
+VIEWS_ranks=()=>{
+  const roster=team().roster.filter(p=>p.status==="Starter"||p.status==="Sub");
+  const snaps=team().rankSnapshots.slice().sort((a,b)=>a.date<b.date?-1:1);
+  const starters=team().roster.filter(p=>p.status==="Starter");
+  const live=teamRank();
+  const series=snaps.map(s=>({date:s.date,rank:avgRank(team().roster.map(p=>s.ranks[p.id])),snap:s}))
+    .concat([{date:"live",rank:live,live:true}]);
+  const withRank=series.filter(s=>s.rank);
+  M.innerHTML=`<div class="grid">
+    <div class="btn-row"><button class="btn" id="addSnap">${icon('trend')} Take fortnight snapshot</button>
+      <span class="chip">Team rank now · ${fmtRank(live)}</span></div>
+    <div class="panel pad">
+      <div class="eyebrow">Team rank trajectory — average of the roster's ranks per snapshot</div>
+      ${withRank.length>1?rankChart(withRank):'<div class="empty">Take at least two snapshots to see a trend</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Snapshots</h3><span class="hint">fortnightly</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Date</th><th>Team rank</th><th class="num">Δ</th>
+        ${roster.map(p=>`<th>${esc(p.handle)}</th>`).join("")}<th>Note</th><th></th></tr></thead>
+        <tbody>${snaps.slice().reverse().map((s,i)=>{
+          const idx=snaps.length-1-i;
+          const cur=avgRank(team().roster.map(p=>s.ranks[p.id]));
+          const prev=idx>0?avgRank(team().roster.map(p=>snaps[idx-1].ranks[p.id])):null;
+          const d=(cur&&prev)?rankUnits(cur)-rankUnits(prev):null;
+          return `<tr><td class="mono">${s.date}</td><td>${fmtRank(cur)}</td>
+          <td class="num ${d==null?'flat':d>0.05?'up':d<-0.05?'down':'flat'}">${d==null?'—':(d>0?'+':'')+d.toFixed(2)}</td>
+          ${roster.map(p=>`<td>${s.ranks[p.id]?rankShort(s.ranks[p.id])+' '+s.ranks[p.id].rr:'<span class="sub">—</span>'}</td>`).join("")}
+          <td>${esc(s.note||'')}</td>
+          <td style="text-align:right;white-space:nowrap"><button class="icar" data-editsnap="${s.id}">✎</button>
+          <button class="icar" data-delsnap="${s.id}">✕</button></td></tr>`;
+        }).join("")||`<tr><td colspan="${roster.length+5}" class="empty">No snapshots yet</td></tr>`}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+  $("#addSnap").onclick=()=>editSnapshot();
+  M.querySelectorAll("[data-editsnap]").forEach(b=>b.onclick=()=>editSnapshot(b.dataset.editsnap));
+  M.querySelectorAll("[data-delsnap]").forEach(b=>b.onclick=()=>{
+    if(confirm("Delete this snapshot?")){team().rankSnapshots=team().rankSnapshots.filter(x=>x.id!==b.dataset.delsnap);save();render();}
+  });
+};
+function editSnapshot(id){
+  const ex=id?team().rankSnapshots.find(s=>s.id===id):null;
+  const roster=team().roster.filter(p=>p.status==="Starter"||p.status==="Sub");
+  const body=document.createElement("div");body.className="modal-b";
+  body.innerHTML=`
+    <div class="fld row2">
+      <div class="fld"><label>Date</label><input type="date" id="snf_date" value="${ex?ex.date:iso(new Date())}"></div>
+      <div class="fld"><label>Note</label><input id="snf_note" value="${ex?esc(ex.note||''):''}"></div>
+    </div>
+    <div class="fld"><label>Ranks — prefilled from each player's current rank</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+      ${roster.map(p=>{
+        const r=(ex&&ex.ranks[p.id])||p.rank||{tier:"Ascendant",div:1,rr:0};
+        return `<div style="display:flex;gap:6px;align-items:center" data-prow data-pid="${p.id}">
+          <span style="flex:1;font-family:var(--disp);font-size:12px">${esc(p.handle)}</span>
+          <select data-f="tier" style="flex:1">${RANK_TIERS.map(t=>`<option ${t===r.tier?'selected':''}>${t}</option>`).join("")}</select>
+          <select data-f="div" style="width:56px">${[1,2,3].map(n=>`<option ${n===r.div?'selected':''}>${n}</option>`).join("")}</select>
+          <input data-f="rr" type="number" min="0" max="100" value="${r.rr??0}" style="width:56px">
+        </div>`;
+      }).join("")}
+      </div>
+    </div>`;
+  modalShell(id?"Edit snapshot":"Take fortnight snapshot",body,()=>{
+    const ranks={};
+    body.querySelectorAll("[data-prow]").forEach(row=>{
+      ranks[row.dataset.pid]={tier:row.querySelector('[data-f=tier]').value,
+        div:+row.querySelector('[data-f=div]').value,
+        rr:clamp(+row.querySelector('[data-f=rr]').value||0,0,100)};
+    });
+    const rec={date:body.querySelector("#snf_date").value,note:body.querySelector("#snf_note").value,ranks};
+    if(id)Object.assign(ex,rec);else team().rankSnapshots.push({id:uid(),...rec});
+    save();render();toast(id?"Snapshot updated":"Snapshot saved");
+  },id?()=>{team().rankSnapshots=team().rankSnapshots.filter(s=>s.id!==id);save();render();toast("Snapshot deleted");}:null);
+}
+function rankChart(series){
+  const w=580,h=210,pad=34;
+  const pts=series.map(s=>rankUnits(s.rank));
+  const lo=Math.floor(Math.min(...pts)-0.6),hi=Math.ceil(Math.max(...pts)+0.6);
+  const x=i=>pad+i*(w-2*pad)/(series.length-1);
+  const y=v=>h-pad-(v-lo)/(hi-lo)*(h-2*pad);
+  const line=pts.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
+  const gl=[];for(let u=Math.ceil(lo);u<=hi;u++){if(u%1===0)gl.push(u);}
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="100%" style="overflow:visible">
+    <defs><linearGradient id="rg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="var(--accent)" stop-opacity=".26"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${gl.map(u=>`<line x1="${pad}" x2="${w-pad}" y1="${y(u)}" y2="${y(u)}" stroke="var(--border)" stroke-width="1"/>
+      <text x="6" y="${y(u)+3}" font-size="8.5" fill="var(--ink-3)" font-family="'Chakra Petch',sans-serif">${rankShort(unitsToRank(u))}</text>`).join("")}
+    <polygon points="${x(0)},${h-pad} ${line} ${x(series.length-1)},${h-pad}" fill="url(#rg)"/>
+    <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${pts.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${i===pts.length-1?4:2.6}" fill="var(--accent)" ${series[i].live?'stroke="var(--surface)" stroke-width="2"':''}/>
+      <text x="${x(i)}" y="${h-10}" font-size="8.5" fill="var(--ink-3)" text-anchor="middle" font-family="'IBM Plex Mono',monospace">${series[i].live?'now':series[i].date.slice(5)}</text>`).join("")}
+  </svg>`;
+}
+
+/* -------- scrims -------- */
+VIEWS_scrims=()=>{
+  const list=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1);
+  const w=state.week,goal=weekGoal(w),done=scrimsInWeek(w).length;
+  const wins=list.filter(s=>s.rw>s.rl).length;
+  M.innerHTML=`<div class="grid">
+    <div class="p111">
+      ${statCard("This week",`${done}<small>/${goal}</small>`,goal?bar(done/goal):"",
+        done>=goal?"Goal met":`${goal-done} to go`)}
+      ${statCard("Scrim record",`${wins}<small>–${list.length-wins}</small>`,"",
+        list.length?Math.round(wins/list.length*100)+"% win rate":"—")}
+      ${statCard("Logged scrims",list.length,"","all time")}
+    </div>
+    <div class="btn-row"><button class="btn" id="addScrim">${icon('swords')} Log scrim</button></div>
+    <div class="grid">
+      ${list.map(s=>{
+        const rt=scrimRatings(s);
+        return `<div class="panel">
+          <div class="panel-h">
+            <h3>${esc(s.map)} · vs ${esc(s.opp)}</h3>
+            <span style="display:flex;gap:8px;align-items:center">
+              <span class="chip ${s.rw>s.rl?'good':'crit'}">${s.rw}–${s.rl}</span>
+              <span class="hint">${s.date} · ${s.rw+s.rl} rds</span>
+              <button class="icar" data-editscrim="${s.id}">✎</button>
+            </span>
+          </div>
+          <div class="tbl-wrap"><table class="tbl">
+            <thead><tr><th>Player</th><th>Agent</th><th class="num">K</th><th class="num">D</th><th class="num">A</th>
+            <th class="num">ADR</th><th class="num">KAST</th><th class="num">R2.0</th><th>Att</th></tr></thead>
+            <tbody>${rt.map(r=>`<tr>
+              <td>${P(r.pid).icon} ${esc(P(r.pid).handle)}</td><td>${esc(r.agent)}</td>
+              <td class="num">${r.k}</td><td class="num">${r.d}</td><td class="num">${r.a}</td>
+              <td class="num">${Math.round(r.adr)}</td><td class="num">${Math.round(r.kast)}%</td>
+              <td class="num ${r.rating==null?'':r.rating>=1.10?'up':r.rating<RATING_BASELINE?'down':''}">${r.rating!=null?r.rating.toFixed(2):'—'}</td>
+              <td>${r.present?'<span class="chip good">✓</span>':'<span class="chip crit">✕</span>'}</td>
+            </tr>`).join("")}</tbody>
+          </table></div>
+        </div>`;
+      }).join("")||`<div class="empty panel pad">No scrims logged yet</div>`}
+    </div>
+  </div>`;
+  $("#addScrim").onclick=()=>editScrim();
+  M.querySelectorAll("[data-editscrim]").forEach(b=>b.onclick=()=>editScrim(b.dataset.editscrim));
+};
+function editScrim(id){
+  const ex=id?team().scrims.find(s=>s.id===id):null;
+  const starters=team().roster.filter(p=>p.status==="Starter"||p.status==="Sub");
+  const lineup=ex?ex.lineup:starters.filter(p=>p.status==="Starter").map(p=>({pid:p.id,agent:p.agents[0]||AGENTS[0],k:0,d:0,a:0,adr:null,kast:null,present:true}));
+  const body=document.createElement("div");
+  body.className="modal-b";
+  body.innerHTML=`
+    <div class="fld row2">
+      <div class="fld"><label>Date</label><input type="date" id="sf_date" value="${ex?ex.date:iso(new Date())}"></div>
+      <div class="fld"><label>Opponent</label><input id="sf_opp" value="${ex?esc(ex.opp):''}"></div>
+    </div>
+    <div class="fld row2">
+      <div class="fld"><label>Map</label><select id="sf_map">${MAPS.map(m=>`<option ${ex&&ex.map===m?'selected':''}>${m}</option>`).join("")}</select></div>
+      <div class="fld"><label>Score (us – them)</label>
+        <div style="display:flex;gap:6px"><input type="number" id="sf_rw" value="${ex?ex.rw:13}" style="width:50%">
+        <input type="number" id="sf_rl" value="${ex?ex.rl:0}" style="width:50%"></div></div>
+    </div>
+    <div class="fld"><label>Lineup — K / D / A / ADR / KAST%</label>
+      <span class="hint">ADR &amp; KAST optional — left blank, Rating 2.0 falls back to an estimate from kills &amp; deaths</span>
+      <div id="sf_lineup" style="overflow-x:auto"></div>
+      <button class="btn ghost sm" type="button" id="sf_add">+ Row</button></div>`;
+  const lu=body.querySelector("#sf_lineup");
+  function rowHTML(l){
+    return `<div class="fld" style="flex-direction:row;gap:5px;align-items:center;margin-bottom:6px;min-width:520px" data-row>
+      <select data-f="pid" style="flex:1.2;min-width:88px">${starters.map(p=>`<option value="${p.id}" ${p.id===l.pid?'selected':''}>${esc(p.handle)}</option>`).join("")}</select>
+      <select data-f="agent" style="flex:1;min-width:82px">${AGENTS.map(a=>`<option ${a===l.agent?'selected':''}>${a}</option>`).join("")}</select>
+      <input data-f="k" type="number" value="${l.k}" style="width:42px" title="Kills">
+      <input data-f="d" type="number" value="${l.d}" style="width:42px" title="Deaths">
+      <input data-f="a" type="number" value="${l.a}" style="width:42px" title="Assists">
+      <input data-f="adr" type="number" value="${l.adr??''}" style="width:48px" placeholder="ADR" title="Avg damage / round">
+      <input data-f="kast" type="number" value="${l.kast??''}" style="width:48px" placeholder="KAST" title="KAST %">
+      <label style="border:0;padding:0" title="Present"><input data-f="present" type="checkbox" ${l.present?'checked':''}></label>
+      <button type="button" class="icar" data-rm>✕</button>
+    </div>`;
+  }
+  function draw(arr){lu.innerHTML=arr.map(rowHTML).join("");
+    lu.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{b.closest("[data-row]").remove();});}
+  draw(lineup);
+  body.querySelector("#sf_add").onclick=()=>{const div=document.createElement("div");div.innerHTML=rowHTML({pid:starters[0].id,agent:AGENTS[0],k:0,d:0,a:0,adr:null,kast:null,present:true});
+    const node=div.firstElementChild;node.querySelector("[data-rm]").onclick=()=>node.remove();lu.appendChild(node);};
+  modalShell(id?"Edit scrim":"Log scrim",body,()=>{
+    const gv=(r,f)=>{const v=r.querySelector('[data-f='+f+']').value;return v===''?null:+v;};
+    const rows=[...lu.querySelectorAll("[data-row]")].map(r=>({
+      pid:r.querySelector('[data-f=pid]').value,
+      agent:r.querySelector('[data-f=agent]').value,
+      k:+r.querySelector('[data-f=k]').value,
+      d:+r.querySelector('[data-f=d]').value,
+      a:+r.querySelector('[data-f=a]').value,
+      adr:gv(r,'adr'),
+      kast:gv(r,'kast'),
+      present:r.querySelector('[data-f=present]').checked,
+    }));
+    const rec={date:body.querySelector("#sf_date").value,opp:body.querySelector("#sf_opp").value||"TBD",
+      map:body.querySelector("#sf_map").value,rw:+body.querySelector("#sf_rw").value,rl:+body.querySelector("#sf_rl").value,lineup:rows};
+    if(id)Object.assign(ex,rec);else team().scrims.push({id:uid(),...rec});
+    save();render();toast(id?"Scrim updated":"Scrim logged");
+  },id?()=>{team().scrims=team().scrims.filter(s=>s.id!==id);save();render();toast("Scrim deleted");}:null);
+}
+
+/* -------- performance -------- */
+VIEWS_performance=()=>{
+  const n=state.perfWindow;
+  const rows=performanceTable(n);
+  const focus=rows.filter(r=>r.flag);
+  const rated=rows.filter(r=>r.rating!=null);
+  const rosterAvg=mean(rated.map(r=>r.rating));
+  const tr=teamRank();
+  M.innerHTML=`<div class="grid">
+    <div class="p111">
+      ${statCard("Team rank",tr?rankStr(tr):"—",tr?`<span class="d flat">${tr.rr} RR</span>`:"","Average of starters' live ranks")}
+      ${statCard("Roster avg R2.0",rosterAvg!=null?rosterAvg.toFixed(2):"—","","Rolling last "+n+" scrims")}
+      ${statCard("Below baseline",focus.length,"",`< ${RATING_BASELINE.toFixed(2)} Rating 2.0`)}
+    </div>
+    <div class="btn-row">
+      <span class="chip">Rolling window</span>
+      ${[3,4,5].map(w=>`<button class="btn ${w===n?'':'ghost'} sm" data-win="${w}">${w} scrims</button>`).join("")}
+    </div>
+    ${focus.length?`<div class="callout warn">Below ${RATING_BASELINE.toFixed(2)} Rating 2.0 over the last ${n} scrims: ${focus.map(r=>`${esc(r.p.handle)} (${r.rating.toFixed(2)}${r.delta!=null?', '+(r.delta>0?'+':'')+r.delta.toFixed(2)+' vs prior':''})`).join(" · ")}</div>`:
+      `<div class="callout good">No player is below ${RATING_BASELINE.toFixed(2)} Rating 2.0 over the last ${n} scrims.</div>`}
+    <div class="panel">
+      <div class="panel-h"><h3>Player form</h3><span class="hint">Rating 2.0 · rolling ${n} scrims</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Player</th><th>Role</th><th>Rank</th><th class="num">Games</th><th class="num">Avg KD</th>
+        <th class="num">Avg R2.0</th><th class="num">Δ vs prior</th><th>Trend</th><th>Status</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr>
+          <td>${r.p.icon} ${esc(r.p.handle)}</td><td>${esc(r.p.role)}</td>
+          <td class="mono" style="font-size:11px">${fmtRank(r.p.rank)}</td>
+          <td class="num">${r.games}</td>
+          <td class="num">${r.kd!=null?r.kd.toFixed(2):'—'}</td>
+          <td class="num ${r.rating==null?'':r.rating>=1.10?'up':r.rating<RATING_BASELINE?'down':''}">${r.rating!=null?r.rating.toFixed(2):'—'}</td>
+          <td class="num ${r.delta==null?'flat':r.delta>0?'up':r.delta<0?'down':'flat'}">${r.delta!=null?(r.delta>0?'+':'')+r.delta.toFixed(2):'—'}</td>
+          <td>${miniSpark(r.trend)}</td>
+          <td>${r.flag?'<span class="chip crit">Focus</span>':r.rating>=1.10?'<span class="chip good">Above avg</span>':'<span class="chip">Around avg</span>'}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    <div class="p31">
+      <div class="panel">
+        <div class="panel-h"><h3>Attendance</h3><span class="hint">last 8 scrims</span></div>
+        <div class="panel-b">${team().roster.filter(p=>p.status!=="Inactive").map(p=>{
+          const a=attendanceRate(p.id,8);return `<div class="rowline"><span>${p.icon} ${esc(p.handle)}</span>
+          <span style="display:flex;align-items:center;gap:8px;width:160px">${bar((a||0),true)}
+          <span class="mono" style="width:38px;text-align:right">${a!=null?Math.round(a*100)+'%':'—'}</span></span></div>`;
+        }).join("")}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Rating 2.0 formula</h3></div>
+        <div class="panel-b sub" style="font-size:12px">
+          <p class="mono" style="font-size:11px;color:var(--ink-2)">R = 0.0073·KAST + 0.3591·KPR − 0.5329·DPR + 0.2372·Impact + 0.0032·ADR + 0.1587</p>
+          <p class="mono" style="font-size:11px;color:var(--ink-2)">Impact = 2.13·KPR + 0.42·APR − 0.41</p>
+          <p>Per-round rates from the scrim's total rounds (K/D/A ÷ rounds). Community-derived HLTV coefficients; <b>1.00 ≈ an average player</b>. Δ compares this window to the ${n} scrims before it.</p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  M.querySelectorAll("[data-win]").forEach(b=>b.onclick=()=>{state.perfWindow=+b.dataset.win;render();});
+};
+function miniSpark(vals){
+  if(!vals||vals.length<2)return '<span class="sub">—</span>';
+  const w=70,h=20,min=Math.min(...vals,0.8),max=Math.max(...vals,1.2);
+  const x=i=>i*w/(vals.length-1),y=v=>h-(v-min)/(max-min)*h;
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <line x1="0" x2="${w}" y1="${y(1)}" y2="${y(1)}" stroke="var(--border-2)" stroke-dasharray="2 2"/>
+    <polyline points="${vals.map((v,i)=>x(i)+','+y(v)).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+    <circle cx="${x(vals.length-1)}" cy="${y(vals[vals.length-1])}" r="2.4" fill="var(--accent)"/>
+  </svg>`;
+}
+
+/* -------- comp lab -------- */
+VIEWS_complab=()=>{
+  const map=state.complabMap;
+  const data=bestAgentsForMap(map);
+  const played=team().scrims.filter(s=>s.map===map);
+  const mapWins=played.filter(s=>s.rw>s.rl).length;
+  const expWr=data.filter(d=>d.best).reduce((s,d)=>s+d.best.wr,0)/(data.filter(d=>d.best).length||1);
+  M.innerHTML=`<div class="grid">
+    <div class="btn-row">${MAPS.map(m=>`<button class="btn ${m===map?'':'ghost'} sm" data-map="${m}">${m}</button>`).join("")}</div>
+    <div class="p111">
+      ${statCard(map+" scrims",played.length,"",played.length?`${mapWins}W ${played.length-mapWins}L`:"no history")}
+      ${statCard("Historical win rate",played.length?Math.round(mapWins/played.length*100)+"%":"—","","on this map")}
+      ${statCard("Best-agents win rate",data.some(d=>d.best)?Math.round(expWr*100)+"%":"—","","mean of each pick's past win rate")}
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Best player + agent · ${esc(map)}</h3><span class="hint">ranked by past win rate + Rating 2.0 on this map</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Player</th><th>Best agent</th><th class="num">Games</th><th class="num">Win rate</th>
+        <th class="num">Avg R2.0</th><th>Other agents played</th></tr></thead>
+        <tbody>${data.map(d=>`<tr>
+          <td>${d.p.icon} ${esc(d.p.handle)}</td>
+          <td>${d.best?`<span class="chip accent">${esc(d.best.agent)}</span>`:`<span class="sub">no games — pool: ${esc(d.p.agents[0]||'?')}</span>`}</td>
+          <td class="num">${d.best?d.best.games:0}</td>
+          <td class="num ${d.best&&d.best.wr>=.5?'up':d.best?'down':''}">${d.best?Math.round(d.best.wr*100)+'%':'—'}</td>
+          <td class="num">${d.best?d.best.rating.toFixed(2):'—'}</td>
+          <td>${d.opts.slice(1).map(o=>`<span class="chip" title="${o.games}g · ${Math.round(o.wr*100)}% · R2.0 ${o.rating.toFixed(2)}">${esc(o.agent)}</span>`).join("")||'<span class="sub">—</span>'}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <div class="panel-b" style="border-top:1px solid var(--border)">
+        <div class="callout">
+          <b>Sample:</b> ${played.length} scrim${played.length===1?'':'s'} logged on ${esc(map)}.
+          ${data.some(d=>d.best)?`<br><b>Best agent per player:</b> ${data.filter(d=>d.best).map(d=>`${esc(d.p.handle)} → ${esc(d.best.agent)} (${d.best.games}g, ${Math.round(d.best.wr*100)}%)`).join(" · ")}`:""}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Map pool overview</h3></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Map</th><th class="num">Scrims</th><th class="num">Win rate</th><th>Sample</th></tr></thead>
+        <tbody>${MAPS.map(m=>{const g=team().scrims.filter(s=>s.map===m);const wn=g.filter(s=>s.rw>s.rl).length;
+          return `<tr><td>${m}</td><td class="num">${g.length}</td>
+          <td class="num ${g.length&&wn/g.length>=.5?'up':g.length?'down':''}">${g.length?Math.round(wn/g.length*100)+'%':'—'}</td>
+          <td><span class="chip ${g.length>=4?'good':g.length>=2?'warn':'crit'}">${g.length>=4?'4+ games':g.length>=2?'2–3 games':g.length===1?'1 game':'none'}</span></td></tr>`;
+        }).join("")}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+  M.querySelectorAll("[data-map]").forEach(b=>b.onclick=()=>{state.complabMap=b.dataset.map;render();});
+};
+
+/* -------- tryouts -------- */
+VIEWS_tryouts=()=>{
+  const sortKey=state.tryoutSort;
+  const scored=team().tryouts.map(t=>{
+    const s=t.scores;
+    const rs=rankUnits({tier:t.tier,div:t.div,rr:0})/24;
+    const composite=(s.mech*.30+s.util*.24+s.comms*.22+s.att*.14+rs*10*.10);
+    return {...t,composite};
+  }).sort((a,b)=>sortKey==="score"?b.composite-a.composite:a.date<b.date?1:-1);
+  const top=scored.filter(t=>t.verdict!=="Pass").slice(0,3);
+  M.innerHTML=`<div class="grid">
+    <div class="btn-row">
+      <button class="btn" id="addTry">${icon('search')} Log tryout</button>
+      <button class="btn ${sortKey==='score'?'':'ghost'} sm" data-sort="score">By potential</button>
+      <button class="btn ${sortKey==='date'?'':'ghost'} sm" data-sort="date">By date</button>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Best potentials</h3><span class="hint">excludes Pass</span></div>
+      <div class="panel-b">
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+        ${top.map((t,i)=>`<div class="pcard cut">
+          <div class="top"><div class="ico">${['①','②','③'][i]}</div>
+          <div style="flex:1"><div class="hd">${esc(t.handle)}</div><div class="rl">${esc(t.role)} · ${t.tier} ${t.div}</div></div></div>
+          <div class="stat"><span class="k">Composite</span><span class="v">${t.composite.toFixed(1)}<small>/10</small></span></div>
+          <div>${chipScore("Mech",t.scores.mech)}${chipScore("Util",t.scores.util)}${chipScore("Comms",t.scores.comms)}${chipScore("Att",t.scores.att)}</div>
+          <span class="chip ${t.verdict==='Shortlist'?'good':t.verdict==='Signed'?'accent':'warn'}">${t.verdict}</span>
+        </div>`).join("")||'<div class="sub">No tryouts logged</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Tryout archive</h3><span class="hint">${team().tryouts.length} logged</span></div>
+      <div class="grid">
+        ${scored.map(t=>`<div class="panel-b" style="border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div>
+              <div style="font-family:var(--disp);font-weight:700;font-size:15px">${esc(t.handle)}
+                <span class="sub" style="font-weight:400">· ${esc(t.role)} · ${t.tier} ${t.div} · ${t.date}</span></div>
+              <div class="agents" style="margin:6px 0">${t.agents.map(a=>`<span class="chip">${esc(a)}</span>`).join("")}</div>
+              <div>${chipScore("Mech",t.scores.mech)}${chipScore("Util",t.scores.util)}${chipScore("Comms",t.scores.comms)}${chipScore("Att",t.scores.att)}
+              <span class="chip accent">Σ ${t.composite.toFixed(1)}</span></div>
+              <p class="sub" style="margin:8px 0 0;max-width:60ch">${esc(t.notes)}</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <span class="chip ${t.verdict==='Shortlist'?'good':t.verdict==='Pass'?'crit':t.verdict==='Signed'?'accent':'warn'}">${t.verdict}</span>
+              <button class="icar" data-edittry="${t.id}">✎</button>
+            </div>
+          </div>
+        </div>`).join("")||'<div class="empty">No tryouts yet</div>'}
+      </div>
+    </div>
+  </div>`;
+  $("#addTry").onclick=()=>editTryout();
+  M.querySelectorAll("[data-sort]").forEach(b=>b.onclick=()=>{state.tryoutSort=b.dataset.sort;render();});
+  M.querySelectorAll("[data-edittry]").forEach(b=>b.onclick=()=>editTryout(b.dataset.edittry));
+};
+function chipScore(k,v){const c=v>=8?'good':v>=6?'':'crit';return `<span class="chip ${c}">${k} ${v}</span>`;}
+function editTryout(id){
+  const t=id?team().tryouts.find(x=>x.id===id):{handle:"",role:"Duelist",tier:"Immortal",div:1,agents:[],date:iso(new Date()),
+    scores:{mech:5,util:5,comms:5,att:5},verdict:"Hold",notes:""};
+  openForm({title:id?"Edit tryout · "+t.handle:"Log tryout",del:id?()=>{team().tryouts=team().tryouts.filter(x=>x.id!==id);save();render();toast("Tryout removed");}:null,fields:[
+    {row:[{name:"handle",label:"Handle",type:"text",value:t.handle,required:true},
+          {name:"date",label:"Date",type:"date",value:t.date}]},
+    {row:[{name:"role",label:"Role tried",type:"select",options:ROLES,value:t.role},
+          {name:"tier",label:"Peak tier",type:"select",options:RANK_TIERS,value:t.tier}]},
+    {name:"div",label:"Division",type:"select",options:[1,2,3],value:t.div},
+    {name:"agents",label:"Agents played",type:"multiselect",options:AGENTS,value:t.agents},
+    {row:[{name:"mech",label:"Mechanics /10",type:"number",value:t.scores.mech,min:1,max:10},
+          {name:"util",label:"Utility /10",type:"number",value:t.scores.util,min:1,max:10}]},
+    {row:[{name:"comms",label:"Comms /10",type:"number",value:t.scores.comms,min:1,max:10},
+          {name:"att",label:"Attitude /10",type:"number",value:t.scores.att,min:1,max:10}]},
+    {name:"verdict",label:"Verdict",type:"select",options:VERDICTS,value:t.verdict},
+    {name:"notes",label:"Commentary",type:"textarea",value:t.notes},
+  ]},d=>{
+    const rec={handle:d.handle,date:d.date,role:d.role,tier:d.tier,div:+d.div,agents:d.agents,
+      scores:{mech:+d.mech,util:+d.util,comms:+d.comms,att:+d.att},verdict:d.verdict,notes:d.notes};
+    if(id)Object.assign(t,rec);else team().tryouts.push({id:uid(),...rec});
+    save();render();toast(id?"Tryout updated":"Tryout logged");
+  });
+}
+
+const VIEWS={overview:VIEWS_overview,roster:VIEWS_roster,schedule:VIEWS_schedule,activities:VIEWS_activities,
+  ranks:VIEWS_ranks,scrims:VIEWS_scrims,performance:VIEWS_performance,complab:VIEWS_complab,tryouts:VIEWS_tryouts};
+
+/* ============================================================ generic form modal */
+function modalShell(title,bodyEl,onSubmit,onDel){
+  const root=$("#modal-root");
+  root.innerHTML="";
+  const wrap=document.createElement("div");wrap.className="scrim";
+  const modal=document.createElement("div");modal.className="modal";
+  const h=document.createElement("div");h.className="modal-h";
+  h.innerHTML=`<h3>${esc(title)}</h3><button class="icar" data-x>✕</button>`;
+  const f=document.createElement("div");f.className="modal-f";
+  f.innerHTML=`${onDel?'<button class="btn ghost sm" data-del style="margin-right:auto;color:var(--crit);border-color:var(--crit)">Delete</button>':''}
+    <button class="btn ghost" data-x>Cancel</button><button class="btn" data-ok>Save</button>`;
+  modal.append(h,bodyEl,f);wrap.append(modal);root.append(wrap);
+  const close=()=>root.innerHTML="";
+  wrap.addEventListener("click",e=>{if(e.target===wrap)close();});
+  root.querySelectorAll("[data-x]").forEach(b=>b.onclick=close);
+  f.querySelector("[data-ok]").onclick=()=>{onSubmit();close();};
+  if(onDel)f.querySelector("[data-del]").onclick=()=>{if(confirm("Delete this?")){onDel();close();}};
+  document.addEventListener("keydown",function esc2(e){if(e.key==="Escape"){close();document.removeEventListener("keydown",esc2);}});
+}
+function openForm({title,fields,del},onSubmit){
+  const body=document.createElement("div");body.className="modal-b";
+  const refs={};
+  const mkField=(fd)=>{
+    const wrap=document.createElement("div");wrap.className="fld";
+    const id="ff_"+fd.name;
+    let inner=`<label for="${id}">${esc(fd.label)}</label>`;
+    if(fd.type==="textarea"){inner+=`<textarea id="${id}">${esc(fd.value||"")}</textarea>`;}
+    else if(fd.type==="select"){
+      const opts=fd.options.map(o=>typeof o==="object"?o:{v:o,t:o});
+      inner+=`<select id="${id}">${opts.map(o=>`<option value="${esc(o.v)}" ${String(o.v)===String(fd.value)?'selected':''}>${esc(o.t)}</option>`).join("")}</select>`;
+    }
+    else if(fd.type==="multiselect"){
+      inner+=`<div class="checks" id="${id}">${fd.options.map(o=>`<label class="${(fd.value||[]).includes(o)?'on':''}"><input type="checkbox" value="${esc(o)}" ${(fd.value||[]).includes(o)?'checked':''}>${esc(o)}</label>`).join("")}</div>`;
+    }
+    else{inner+=`<input id="${id}" type="${fd.type||'text'}" value="${esc(fd.value??"")}" ${fd.min!=null?`min="${fd.min}"`:''} ${fd.max!=null?`max="${fd.max}"`:''} ${fd.step?`step="${fd.step}"`:''}>`;}
+    if(fd.hint)inner+=`<span class="hint">${esc(fd.hint)}</span>`;
+    wrap.innerHTML=inner;
+    refs[fd.name]=fd;
+    return wrap;
+  };
+  fields.forEach(fd=>{
+    if(fd.row){
+      const r=document.createElement("div");r.className="fld row2";
+      fd.row.forEach(sub=>r.append(mkField(sub)));
+      body.append(r);
+    }else body.append(mkField(fd));
+  });
+  body.querySelectorAll(".checks label").forEach(l=>l.onclick=e=>{
+    if(e.target.tagName!=="INPUT"){const cb=l.querySelector("input");cb.checked=!cb.checked;}
+    setTimeout(()=>l.classList.toggle("on",l.querySelector("input").checked));
+  });
+  modalShell(title,body,()=>{
+    const data={};
+    Object.values(refs).forEach(fd=>{
+      const el=body.querySelector("#ff_"+fd.name);
+      if(fd.type==="multiselect")data[fd.name]=[...el.querySelectorAll("input:checked")].map(i=>i.value);
+      else data[fd.name]=el.value;
+    });
+    onSubmit(data);
+  },del);
+}
+
+/* ============================================================ wire shell */
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b){state.view=b.dataset.v;render();}});
+$("#wkPrev").onclick=()=>{state.week=addDays(state.week,-7);render();};
+$("#wkNext").onclick=()=>{state.week=addDays(state.week,7);render();};
+$("#tourPill").onclick=()=>{
+  const k=iso(state.week),tw=team().tournamentWeeks,i=tw.indexOf(k);
+  if(i<0)tw.push(k);else tw.splice(i,1);save();render();
+  toast(i<0?"Marked tournament week":"Unmarked");
+};
+$("#teamSelect").onchange=e=>{
+  if(e.target.value==="__new"){
+    openForm({title:"New team",fields:[
+      {name:"name",label:"Team name",type:"text",value:"",required:true},
+      {name:"tag",label:"Tag",type:"text",value:""},
+    ]},d=>{
+      const nt={id:uid(),name:d.name,tag:d.tag||d.name.slice(0,4).toUpperCase(),server:"EU",rankApiKey:"",
+        scrimGoal:{base:1,tournament:3},tournamentWeeks:[],roster:[],scrims:[],rankSnapshots:[],tryouts:[],
+        schedule:{winStart:"11:00",winEnd:"24:00",includeSubs:false,blocks:[]},activities:{weeks:{},months:{}}};
+      DB.teams.push(nt);DB.activeTeamId=nt.id;save();render();toast("Team created");
+    });
+    e.target.value=DB.activeTeamId;
+  }else{DB.activeTeamId=e.target.value;save();render();}
+};
+$("#btnTheme").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const next=cur==="dark"?"light":cur==="light"?null:"dark";
+  if(next)document.documentElement.setAttribute("data-theme",next);else document.documentElement.removeAttribute("data-theme");
+  try{localStorage.setItem("sightline.theme",next||"");}catch(e){}
+};
+$("#btnExport").onclick=()=>{
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`sightline-${iso(new Date())}.json`;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast("Exported backup file");
+};
+$("#btnImport").onclick=()=>$("#fileImport").click();
+$("#fileImport").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const j=JSON.parse(rd.result);
+      if(!j||!Array.isArray(j.teams)||!j.teams.length)throw new Error("no teams");
+      if(!confirm("Replace all current data with the imported file?"))return;
+      DB=j;if(!DB.activeTeamId)DB.activeTeamId=DB.teams[0].id;
+      save();render();toast("Imported "+DB.teams.length+" team(s)");
+    }catch(err){toast("Import failed — not a valid Sightline export");}
+    e.target.value="";
+  };
+  rd.readAsText(f);
+};
+$("#btnReset").onclick=()=>{if(confirm("Reset all teams and data to the sample XPE roster?")){localStorage.removeItem(KEY);DB=load();state.week=mondayOf(new Date("2026-09-03"));render();toast("Reset to sample data");}};
+
+try{const th=localStorage.getItem("sightline.theme");if(th)document.documentElement.setAttribute("data-theme",th);}catch(e){}
+render();
+</script>

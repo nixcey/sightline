@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sightline Scrim Importer</title>
+<link rel="stylesheet" href="desktop.css">
+</head>
+<body>
+<header>
+  <div class="mark">SIGHTLINE</div>
+  <div class="sub">scrim importer</div>
+  <div class="spacer"></div>
+  <button id="min" title="Minimize">–</button>
+  <button id="close" title="Close">✕</button>
+</header>
+
+<main>
+  <section>
+    <div class="eyebrow">Connection</div>
+    <label>Sightline URL
+      <input id="url" placeholder="https://sightline.yourdomain.com" autocomplete="off" spellcheck="false">
+    </label>
+    <label>Ingest key
+      <input id="key" placeholder="sk_…" autocomplete="off" spellcheck="false">
+      <span class="hint">Sightline → Scrims → Scrim importer → generate</span>
+    </label>
+    <div class="row">
+      <button id="save" class="primary">Save</button>
+      <button id="test">Test connection</button>
+      <span id="connState" class="pill"></span>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Import</div>
+    <label class="check"><input type="checkbox" id="auto"> Auto-import matches as they finish</label>
+    <div class="modes">
+      <span>Import modes:</span>
+      <label class="check"><input type="checkbox" data-mode="custom"> Custom games</label>
+      <label class="check"><input type="checkbox" data-mode="unrated"> Unrated</label>
+      <label class="check"><input type="checkbox" data-mode="competitive"> Competitive</label>
+    </div>
+    <label>Opponent name for the next imported match <span class="hint">(optional — applied once, then cleared)</span>
+      <input id="opp" placeholder="e.g. Team Onyx" autocomplete="off">
+    </label>
+    <div class="row">
+      <button id="rescan">Re-scan last match</button>
+      <span id="queueState" class="hint"></span>
+    </div>
+  </section>
+
+  <section class="grow">
+    <div class="eyebrow">Activity <button id="clearlog" class="link">clear</button></div>
+    <ul id="log"></ul>
+  </section>
+</main>
+
+<script src="store.js"></script>
+<script src="desktop.js"></script>
+</body>
+</html>

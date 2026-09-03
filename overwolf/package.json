@@ -1,0 +1,7 @@
+{
+  "name": "sightline-scrim-importer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Overwolf companion app — auto-imports Valorant custom games into Sightline. Not an npm package; loaded by Overwolf from manifest.json."
+}

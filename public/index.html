@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sightline</title>
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<div id="gate" hidden></div>
+
+<div class="app" id="app" hidden>
+  <nav class="rail">
+    <div class="brand">
+      <div class="mark">SIGHTLINE</div>
+      <div class="sub">ops deck</div>
+    </div>
+    <div class="teamsel">
+      <label for="teamSelect">Active team</label>
+      <select id="teamSelect"></select>
+    </div>
+    <div class="nav" id="nav"></div>
+    <div class="railfoot">
+      <button id="btnTheme">Theme</button>
+      <button id="btnExport">Export</button>
+      <button id="btnAccount">Account</button>
+    </div>
+  </nav>
+  <div class="stage">
+    <header class="topbar">
+      <div class="tt">
+        <div class="crumb" id="crumb">Overview</div>
+        <h1 id="viewTitle">Overview</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span class="chip" id="roleBadge" hidden></span>
+        <button class="tourpill" id="tourPill">◆ Tournament week</button>
+        <div class="weekpick">
+          <button id="wkPrev" aria-label="Previous week">‹</button>
+          <span class="lbl" id="wkLabel">—</span>
+          <button id="wkNext" aria-label="Next week">›</button>
+        </div>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="/api.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

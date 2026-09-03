@@ -1,0 +1,21 @@
+name = "sightline"
+main = "src/index.js"
+compatibility_date = "2025-01-15"
+account_id = "a850b3b4825d56644a39d68129600064"
+workers_dev = false
+
+# Public hostname (Workers Custom Domain — Cloudflare manages the DNS record + cert).
+routes = [
+  { pattern = "sightline.nixcey.com", custom_domain = true }
+]
+
+# Static frontend (public/) served by the Worker.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sightline"
+database_id = "a32fea7f-c132-4139-88a1-308e80007ec4"
+migrations_dir = "migrations"
