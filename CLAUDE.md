@@ -7,7 +7,9 @@ companion app.
 ## Layout
 - `src/index.js` — the whole API (Hono routes) + static-asset fallthrough
 - `src/auth.js` — PBKDF2 password hashing, sessions, cookies
-- `src/valorant.js` — HenrikDev rank lookup (server-side)
+- `src/valorant.js` — HenrikDev lookups (server-side): `fetchRank` (current
+  tier/RR via v3/mmr) + `fetchMmrHistory` (per-match ranked history via
+  v2/stored-mmr-history, paginated)
 - `src/seed.js` — sample data for new teams
 - `public/` — frontend: `index.html`, `app.js` (all views), `app.css`, `api.js`
 - `migrations/` — D1 schema, applied in order
@@ -42,6 +44,13 @@ companion app.
 - Scrim import (`POST /api/import/match`, bearer = `teams.ingest_key`) dedupes on
   `(team_id, match_id)` and only accepts customs with `import_min`+ players whose
   in-game name matches `import_prefix`.
+- **Rank tracking:** `POST /api/teams/:id/sync-ranks` refreshes each rostered
+  player's `players.rank` *and* backfills `rank_history` (one row per ranked
+  match, PK `(team_id, player_id, match_id)` → incremental). The Rank Tracking
+  tab lazy-loads `GET /api/teams/:id/rank-history` into `state.rankHist` (not the
+  bundle — it can grow large); `syncRanks()` nulls that cache. `tierRank(id,rr)`
+  maps a HenrikDev tier id to the app's `{tier,div,rr}` (RR is `%100` for
+  Immortal+). The old manual `rank_snapshots` feature is gone (dropped in 0007).
 - **Matches:** `scrims` rows carry `kind` (`'scrim'` | `'official'`) + a `vods`
   JSON array. `matchesOf(kind)` in `app.js` filters the bundle; the Scrims and
   Officials tabs are one `matchListView(kind)`. Officials never count toward the

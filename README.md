@@ -24,7 +24,7 @@ manager can **delete the team**. A team always keeps at least one manager.
 | Delete the team | manager only | — |
 | Roster: add/remove, status, joined date | ✅ | — |
 | Roster: own handle, name, role, icon, agents, Riot ID, rank, notes | ✅ | own only |
-| Scrims, officials, rank snapshots, tryouts, rank sync, activities, tournament weeks | ✅ | — |
+| Scrims, officials, tryouts, rank sync, activities, tournament weeks | ✅ | — |
 | Schedule: active window, other players' blocks | ✅ | — |
 | Schedule: **own** availability blocks | ✅ | ✅ |
 | Performance notes on a player | ✅ | own only |
@@ -98,9 +98,19 @@ in the D1 `teams` row, never reaches the browser). Get a free key from their
 Discord. tracker.gg's API and Riot's official API can't be used — no CORS, bot
 protection, and no public "current rank by Riot ID" endpoint.
 
-Each player has a **Riot ID** (name + tag, optional per-player region). "⟳ Sync
-ranks" on the Roster tab fills in every player's current tier + RR; manual entry
-is the fallback.
+Each player has a **Riot ID** (name + tag, optional per-player region). One sync
+button does two things per rostered player:
+
+1. **current rank** — `/valorant/v3/mmr` → tier + RR onto `players.rank` (works
+   even for accounts HenrikDev has never seen).
+2. **match history** — `/valorant/v2/stored-mmr-history` → every stored ranked
+   game into `rank_history`, deduped on `match_id` so re-running only adds new
+   games. HenrikDev only stores games played *after* an account is first queried
+   through their API, so the first sync of a fresh account may be short.
+
+**Rank Tracking** tab: a team-average elo trajectory plus a per-player view
+(elo-per-game chart, W–L from RR deltas, peak, recent games). Manual tier entry
+on the Roster tab is still the fallback when there's no Riot ID / API key.
 
 ## Rating 2.0
 
@@ -135,7 +145,7 @@ when it isn't set "mentionable" in Discord.
 
 ## Data model
 
-`teams` → each has `players`, `scrims`, `rank_snapshots`, `tryouts`,
+`teams` → each has `players`, `scrims`, `rank_history`, `tryouts`,
 `activities_weeks`, `activities_months`, a JSON `schedule` column, and
 `team_members` (user ↔ role ↔ optional linked player). Nested structures
 (lineups, agent pools, score breakdowns, schedule blocks, scrim VOD links,

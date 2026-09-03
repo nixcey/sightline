@@ -262,6 +262,16 @@ details.panel[open]>summary{border-bottom:1px solid var(--border)}
 .lupres input{width:16px;height:16px}
 .lurow .icar{justify-self:center}
 
+/* rank tracking */
+.rkseg{display:flex;flex-wrap:wrap;gap:4px}
+.rkseg button{font-family:var(--disp);font-size:11px;letter-spacing:.04em;padding:6px 11px;border:1px solid var(--border-2);
+  background:var(--surface-2);color:var(--ink-2);border-radius:2px;cursor:pointer}
+.rkseg button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.rkseg button .sub{font-size:9px}
+.rklegend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px;color:var(--ink-2)}
+.rklegend span{display:inline-flex;align-items:center;gap:5px}
+.rklegend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
 #toast-root{position:fixed;right:18px;bottom:18px;z-index:95;display:flex;flex-direction:column;gap:8px}
 .toast{background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:3px;font-size:12px;font-family:var(--disp);
   letter-spacing:.04em;box-shadow:var(--shadow);animation:tin .2s ease}

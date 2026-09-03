@@ -40,6 +40,16 @@ function rankStr(r){return !r?"—":r.tier==="Radiant"?"Radiant":`${r.tier} ${r.
 function rankShort(r){return rankStr(r).replace("Immortal","Imm").replace("Ascendant","Asc").replace("Diamond","Dia").replace("Platinum","Plat").replace("Radiant","Rad");}
 function fmtRank(r){return !r?"—":rankStr(r)+((r.tier==="Radiant"&&!r.rr)?"":` · ${r.rr||0} RR`);}
 function avgRank(ranks){const v=(ranks||[]).filter(Boolean);return v.length?unitsToRank(mean(v.map(rankUnits))):null;}
+/* HenrikDev tier id (3=Iron 1 … 27=Radiant) -> app {tier,div,rr}.
+   Immortal+ RR is cumulative in the API (0-300); the in-game number is rr % 100. */
+function tierRank(id,rr){
+  const i=Math.max(0,(id||0)-3);
+  return {tier:RANK_TIERS[Math.min(RANK_TIERS.length-1,Math.floor(i/3))]||"Iron",div:i%3+1,rr:((rr||0)%100+100)%100};
+}
+/* absolute elo -> the same continuous scale as rankUnits() (100 elo per division) */
+const eloUnits=e=>(e||0)/100;
+const PLAYER_COLORS=["#ff4655","#3ad1bf","#e7a343","#7c9cff","#c479ff","#6ee787","#ff8bd1"];
+const pColor=i=>PLAYER_COLORS[i%PLAYER_COLORS.length];
 
 /* estimators for when a scrim row is missing ADR / KAST (manual entry without a tracker) */
 const estADR=kpr=>Math.round(clamp(40+kpr*145,45,260));
@@ -79,8 +89,10 @@ async function syncRanks(only){
   state.syncing=true;render();
   try{
     const r=await API.post(`/api/teams/${TID()}/sync-ranks`, only?{only:only.id}:{});
+    state.rankHist=null;                 // force a re-fetch of the history
     await reload();
-    toast(`Ranks synced ${r.done}/${r.total}`+(r.fail?` · ${r.fail} failed (${r.err})`:""));
+    const nAdd=r.added||0;
+    toast(`Rank sync: ${r.done}/${r.total} live`+(nAdd?` · +${nAdd} game${nAdd===1?"":"s"}`:"")+(r.fail?` · ${r.fail} failed (${r.err})`:""));
   }catch(e){
     toast(e.message||"Sync failed");
   }finally{
@@ -129,7 +141,7 @@ async function act(promise,okMsg){
 /* ============================================================ ui state */
 const MFILTER_DEF={map:"",opp:"",result:"",margin:"",player:"",agent:"",comp:[],since:""};
 let state={view:"overview",week:mondayOf(new Date()),perfWindow:5,complabMap:"Ascent",tryoutSort:"score",syncing:false,
-  mfilter:{...MFILTER_DEF,comp:[]},mfilterOpen:false};
+  mfilter:{...MFILTER_DEF,comp:[]},mfilterOpen:false,rankView:"team",rankHist:null};
 
 const NAV=[
   ["overview","Overview",icon("grid")],
@@ -310,10 +322,7 @@ VIEWS_overview=()=>{
   const flagged=perf.filter(r=>r.flag);
   const starters=team().roster.filter(p=>p.status==="Starter");
   const tr=teamRank();
-  const snaps=team().rankSnapshots.slice().sort((a,b)=>a.date<b.date?-1:1);
-  const lastSnap=snaps[snaps.length-1];
-  const prevAvg=lastSnap?avgRank(starters.map(p=>lastSnap.ranks[p.id])):null;
-  const rDelta=(tr&&prevAvg)?rankUnits(tr)-rankUnits(prevAvg):0;
+  const rDelta=teamRankDelta(14)||0;   // 14-day team rank movement (from synced rank history)
   const att=(()=>{const list=matchesOf("scrim").slice(-5);let tot=0,p=0;list.forEach(s=>s.lineup.forEach(l=>{tot++;if(l.present)p++;}));return tot?p/tot:null;})();
   const wk=team().activities.weeks[iso(mon)];
   let nextAct=null;
@@ -691,99 +700,179 @@ VIEWS_activities=()=>{
 
 /* -------- ranks -------- */
 VIEWS_ranks=()=>{
-  const roster=team().roster.filter(p=>p.status==="Starter"||p.status==="Sub");
-  const snaps=team().rankSnapshots.slice().sort((a,b)=>a.date<b.date?-1:1);
-  const starters=team().roster.filter(p=>p.status==="Starter");
+  if(state.rankHist===null){
+    M.innerHTML=`<div class="panel pad empty">Loading rank history…</div>`;
+    API.get(`/api/teams/${TID()}/rank-history`)
+      .then(r=>{state.rankHist=r.history||[];render();})
+      .catch(e=>{state.rankHist=[];toast(e.message||"Couldn't load rank history");render();});
+    return;
+  }
+  const hist=state.rankHist;
+  const roster=team().roster.filter(p=>p.status!=="Inactive");
+  const byPlayer={};roster.forEach(p=>byPlayer[p.id]=[]);
+  hist.forEach(e=>{if(byPlayer[e.playerId])byPlayer[e.playerId].push(e);});
+  Object.values(byPlayer).forEach(a=>a.sort((x,y)=>x.playedAt<y.playedAt?-1:1));
   const live=teamRank();
-  const series=snaps.map(s=>({date:s.date,rank:avgRank(team().roster.map(p=>s.ranks[p.id])),snap:s}))
-    .concat([{date:"live",rank:live,live:true}]);
-  const withRank=series.filter(s=>s.rank);
+  const sel=state.rankView;
+  const seg=`<span class="rkseg">
+    <button class="${sel==='team'?'on':''}" data-rv="team">Team</button>
+    ${roster.map(p=>`<button class="${sel===p.id?'on':''}" data-rv="${p.id}">${esc(p.handle)}${byPlayer[p.id].length?'':' <span class="sub">·0</span>'}</button>`).join("")}
+  </span>`;
+  let bodyHTML;
+  if(!hist.length){
+    bodyHTML=`<div class="panel pad empty">No rank history yet.<br>
+      ${team().hasRankApiKey
+        ? (canEdit()?'Hit <b>⟳ Sync rank history</b> above — it pulls every ranked game HenrikDev has stored for each roster player, then keeps only new games on later syncs.':'An admin needs to run a rank sync.')
+        : 'Add a HenrikDev API key in <b>Team settings</b> first.'}</div>`;
+  }else if(sel==='team'||!roster.some(p=>p.id===sel)){
+    bodyHTML=rankTeamView(roster,byPlayer,live);
+  }else{
+    const p=roster.find(x=>x.id===sel);
+    bodyHTML=rankPlayerView(p,byPlayer[p.id]||[]);
+  }
   M.innerHTML=`<div class="grid">
-    <div class="btn-row">${canEdit()?`<button class="btn" id="addSnap">${icon('trend')} Take fortnight snapshot</button>`:''}
-      <span class="chip">Team rank now · ${fmtRank(live)}</span></div>
+    <div class="btn-row" style="flex-wrap:wrap;gap:8px">
+      ${canEdit()?`<button class="btn" id="rkSync" ${state.syncing?'disabled':''}>${state.syncing?'Syncing…':'⟳ Sync rank history'}</button>`:''}
+      <span class="chip">Team rank now · ${fmtRank(live)}</span>
+    </div>
+    ${seg}
+    ${bodyHTML}
+  </div>`;
+  const sy=$("#rkSync");if(sy)sy.onclick=()=>syncRanks();
+  M.querySelectorAll("[data-rv]").forEach(b=>b.onclick=()=>{state.rankView=b.dataset.rv;render();});
+};
+function downsample(arr,n){
+  if(arr.length<=n)return arr;
+  const out=[],step=(arr.length-1)/(n-1);
+  for(let i=0;i<n;i++)out.push(arr[Math.round(i*step)]);
+  return out;
+}
+/* 14-day team rank movement in rank-units, from synced history; null if unavailable */
+function teamRankDelta(days){
+  const h=state.rankHist;
+  if(!h||!h.length)return null;
+  const ids=new Set(team().roster.map(p=>p.id));
+  const by={};
+  h.forEach(e=>{if(ids.has(e.playerId))(by[e.playerId]=by[e.playerId]||[]).push(e);});
+  const keys=Object.keys(by);if(!keys.length)return null;
+  keys.forEach(k=>by[k].sort((a,b)=>a.playedAt<b.playedAt?-1:1));
+  const cut=Date.now()-days*864e5;
+  const eloAt=(arr)=>{let v=null;for(const e of arr){if(Date.parse(e.playedAt)<=cut)v=e.elo;else break;}return v;};
+  const now=[],then=[];
+  keys.forEach(k=>{now.push(by[k][by[k].length-1].elo);const t=eloAt(by[k]);if(t!=null)then.push(t);});
+  if(!then.length)return null;
+  return eloUnits(mean(now))-eloUnits(mean(then));
+}
+function teamEloSeries(byPlayer){
+  const ids=Object.keys(byPlayer).filter(id=>byPlayer[id].length);
+  if(!ids.length)return [];
+  const stamps=[...new Set(ids.flatMap(id=>byPlayer[id].map(e=>e.playedAt)))].sort();
+  const cursor={},latest={};ids.forEach(id=>cursor[id]=0);
+  const out=[];
+  for(const ts of stamps){
+    ids.forEach(id=>{const a=byPlayer[id];while(cursor[id]<a.length&&a[cursor[id]].playedAt<=ts){latest[id]=a[cursor[id]].elo;cursor[id]++;}});
+    const vals=ids.map(id=>latest[id]).filter(v=>v!=null);
+    if(vals.length)out.push({t:Date.parse(ts),y:mean(vals)});
+  }
+  return out;
+}
+/* lines: [{label,color,pts:[{t,y:elo}]}] */
+function mmrChart(lines){
+  const w=640,h=230,padL=40,padR=14,padT=12,padB=22;
+  const all=lines.flatMap(l=>l.pts);
+  if(all.length<2)return `<div class="empty">Needs at least 2 ranked games to chart.</div>`;
+  const xs=all.map(p=>p.t),ys=all.map(p=>eloUnits(p.y));
+  const t0=Math.min(...xs),t1=Math.max(...xs);
+  let lo=Math.min(...ys),hi=Math.max(...ys);const pu=Math.max(0.4,(hi-lo)*0.12);lo-=pu;hi+=pu;
+  const X=t=>padL+(t1===t0?0.5:(t-t0)/(t1-t0))*(w-padL-padR);
+  const Y=u=>h-padB-(u-lo)/((hi-lo)||1)*(h-padT-padB);
+  const grid=[];for(let u=Math.ceil(lo);u<=hi;u++)grid.push(u);
+  const df=t=>{const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate();};
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
+    ${grid.map(u=>`<line x1="${padL}" x2="${w-padR}" y1="${Y(u).toFixed(1)}" y2="${Y(u).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+      <text x="3" y="${(Y(u)+3).toFixed(1)}" font-size="8.5" fill="var(--ink-3)" font-family="'Chakra Petch',sans-serif">${rankShort(unitsToRank(u))}</text>`).join("")}
+    <text x="${padL}" y="${h-5}" font-size="8" fill="var(--ink-3)" font-family="'IBM Plex Mono',monospace">${df(t0)}</text>
+    <text x="${w-padR}" y="${h-5}" font-size="8" fill="var(--ink-3)" text-anchor="end" font-family="'IBM Plex Mono',monospace">${df(t1)}</text>
+    ${lines.map(l=>{
+      const pl=l.pts.slice().sort((a,b)=>a.t-b.t);
+      const d=pl.map((p,i)=>`${i?'L':'M'}${X(p.t).toFixed(1)},${Y(eloUnits(p.y)).toFixed(1)}`).join(" ");
+      const last=pl[pl.length-1];
+      return `<path d="${d}" fill="none" stroke="${l.color}" stroke-width="2" stroke-linejoin="round" opacity="${lines.length>1?0.9:1}"/>
+        <circle cx="${X(last.t).toFixed(1)}" cy="${Y(eloUnits(last.y)).toFixed(1)}" r="3.2" fill="${l.color}"/>`;
+    }).join("")}
+  </svg>
+  ${lines.length>1?`<div class="rklegend">${lines.map(l=>`<span><i style="background:${l.color}"></i>${esc(l.label)}</span>`).join("")}</div>`:''}`;
+}
+function playerRankStats(a){
+  const cur=a[a.length-1];
+  const wins=a.filter(e=>e.lastChange>0).length,losses=a.filter(e=>e.lastChange<0).length;
+  const net=a.reduce((s,e)=>s+(e.lastChange||0),0);
+  const peak=a.reduce((m,e)=>e.elo>m.elo?e:m,a[0]);
+  const wk=a.filter(e=>Date.parse(e.playedAt)>=Date.now()-7*864e5);
+  const d7=wk.length?wk.reduce((s,e)=>s+(e.lastChange||0),0):null;
+  let dir=Math.sign((cur&&cur.lastChange)||0),streak=0;
+  for(let i=a.length-1;i>=0;i--){const s=Math.sign(a[i].lastChange||0);if(s===dir&&s!==0)streak++;else break;}
+  return {cur,wins,losses,net,peak,d7,dir,streak};
+}
+function rankTeamView(roster,byPlayer,live){
+  const tracked=roster.filter(p=>byPlayer[p.id].length);
+  if(!tracked.length)return `<div class="panel pad empty">History synced, but no competitive games found for anyone on the roster yet.</div>`;
+  const lines=[{label:"Team avg",color:"var(--accent)",pts:downsample(teamEloSeries(byPlayer),90)}];
+  const rows=tracked.map(p=>({p,idx:roster.indexOf(p),a:byPlayer[p.id],...playerRankStats(byPlayer[p.id])}))
+    .sort((x,y)=>(y.cur?y.cur.elo:0)-(x.cur?x.cur.elo:0));
+  return `
     <div class="panel pad">
-      <div class="eyebrow">Team rank trajectory — average of the roster's ranks per snapshot</div>
-      ${withRank.length>1?rankChart(withRank):'<div class="empty">Take at least two snapshots to see a trend</div>'}
+      <div class="eyebrow">Team rank trajectory · rolling average elo · ${tracked.length} tracked</div>
+      ${mmrChart(lines)}
     </div>
     <div class="panel">
-      <div class="panel-h"><h3>Snapshots</h3><span class="hint">fortnightly</span></div>
+      <div class="panel-h"><h3>By player</h3><span class="hint">competitive queue · tap a row</span></div>
       <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Date</th><th>Team rank</th><th class="num">Δ</th>
-        ${roster.map(p=>`<th>${esc(p.handle)}</th>`).join("")}<th>Note</th><th></th></tr></thead>
-        <tbody>${snaps.slice().reverse().map((s,i)=>{
-          const idx=snaps.length-1-i;
-          const cur=avgRank(team().roster.map(p=>s.ranks[p.id]));
-          const prev=idx>0?avgRank(team().roster.map(p=>snaps[idx-1].ranks[p.id])):null;
-          const d=(cur&&prev)?rankUnits(cur)-rankUnits(prev):null;
-          return `<tr><td class="mono">${s.date}</td><td>${fmtRank(cur)}</td>
-          <td class="num ${d==null?'flat':d>0.05?'up':d<-0.05?'down':'flat'}">${d==null?'—':(d>0?'+':'')+d.toFixed(2)}</td>
-          ${roster.map(p=>`<td>${s.ranks[p.id]?rankShort(s.ranks[p.id])+' '+s.ranks[p.id].rr:'<span class="sub">—</span>'}</td>`).join("")}
-          <td>${esc(s.note||'')}</td>
-          <td style="text-align:right;white-space:nowrap">${canEdit()?`<button class="icar" data-editsnap="${s.id}">✎</button>
-          <button class="icar" data-delsnap="${s.id}">✕</button>`:''}</td></tr>`;
-        }).join("")||`<tr><td colspan="${roster.length+5}" class="empty">No snapshots yet</td></tr>`}</tbody>
+        <thead><tr><th>Player</th><th>Current</th><th class="num">RR</th><th class="num">7d Δ</th><th class="num">W–L</th><th class="num">Net RR</th><th>Peak</th><th class="num">Games</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr style="cursor:pointer" data-rv="${r.p.id}">
+          <td><span style="color:${pColor(r.idx)}">●</span> ${esc(r.p.handle)}</td>
+          <td>${r.cur?rankShort(tierRank(r.cur.tierId,r.cur.rr)):'—'}</td>
+          <td class="num">${r.cur?tierRank(r.cur.tierId,r.cur.rr).rr:'—'}</td>
+          <td class="num ${r.d7==null?'flat':r.d7>0?'up':r.d7<0?'down':'flat'}">${r.d7==null?'—':(r.d7>0?'+':'')+r.d7}</td>
+          <td class="num">${r.wins}–${r.losses}</td>
+          <td class="num ${r.net>0?'up':r.net<0?'down':'flat'}">${r.net>0?'+':''}${r.net}</td>
+          <td>${rankShort(tierRank(r.peak.tierId,r.peak.rr))} ${tierRank(r.peak.tierId,r.peak.rr).rr}</td>
+          <td class="num">${r.a.length}</td>
+        </tr>`).join("")}</tbody>
       </table></div>
-    </div>
-  </div>`;
-  const as=$("#addSnap");if(as)as.onclick=()=>editSnapshot();
-  M.querySelectorAll("[data-editsnap]").forEach(b=>b.onclick=()=>editSnapshot(b.dataset.editsnap));
-  M.querySelectorAll("[data-delsnap]").forEach(b=>b.onclick=()=>{
-    if(confirm("Delete this snapshot?"))act(API.del(`/api/teams/${TID()}/snapshots/${b.dataset.delsnap}`),"Snapshot deleted");
-  });
-};
-function editSnapshot(id){
-  const ex=id?team().rankSnapshots.find(s=>s.id===id):null;
-  const roster=team().roster.filter(p=>p.status==="Starter"||p.status==="Sub");
-  const body=document.createElement("div");body.className="modal-b";
-  body.innerHTML=`
-    <div class="fld row2">
-      <div class="fld"><label>Date</label><input type="date" id="snf_date" value="${ex?ex.date:iso(new Date())}"></div>
-      <div class="fld"><label>Note</label><input id="snf_note" value="${ex?esc(ex.note||''):''}"></div>
-    </div>
-    <div class="fld"><label>Ranks — prefilled from each player's current rank</label>
-      <div style="display:flex;flex-direction:column;gap:6px">
-      ${roster.map(p=>{
-        const r=(ex&&ex.ranks[p.id])||p.rank||{tier:"Ascendant",div:1,rr:0};
-        return `<div style="display:flex;gap:6px;align-items:center" data-prow data-pid="${p.id}">
-          <span style="flex:1;font-family:var(--disp);font-size:12px">${esc(p.handle)}</span>
-          <select data-f="tier" style="flex:1">${RANK_TIERS.map(t=>`<option ${t===r.tier?'selected':''}>${t}</option>`).join("")}</select>
-          <select data-f="div" style="width:56px">${[1,2,3].map(n=>`<option ${n===r.div?'selected':''}>${n}</option>`).join("")}</select>
-          <input data-f="rr" type="number" min="0" max="100" value="${r.rr??0}" style="width:56px">
-        </div>`;
-      }).join("")}
-      </div>
     </div>`;
-  modalShell(id?"Edit snapshot":"Take fortnight snapshot",body,()=>{
-    const ranks={};
-    body.querySelectorAll("[data-prow]").forEach(row=>{
-      ranks[row.dataset.pid]={tier:row.querySelector('[data-f=tier]').value,
-        div:+row.querySelector('[data-f=div]').value,
-        rr:clamp(+row.querySelector('[data-f=rr]').value||0,0,100)};
-    });
-    const rec={date:body.querySelector("#snf_date").value,note:body.querySelector("#snf_note").value,ranks};
-    act(id?API.put(`/api/teams/${TID()}/snapshots/${id}`,rec):API.post(`/api/teams/${TID()}/snapshots`,rec),
-        id?"Snapshot updated":"Snapshot saved");
-  },id?()=>act(API.del(`/api/teams/${TID()}/snapshots/${id}`),"Snapshot deleted"):null);
 }
-function rankChart(series){
-  const w=580,h=210,pad=34;
-  const pts=series.map(s=>rankUnits(s.rank));
-  const lo=Math.floor(Math.min(...pts)-0.6),hi=Math.ceil(Math.max(...pts)+0.6);
-  const x=i=>pad+i*(w-2*pad)/(series.length-1);
-  const y=v=>h-pad-(v-lo)/(hi-lo)*(h-2*pad);
-  const line=pts.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
-  const gl=[];for(let u=Math.ceil(lo);u<=hi;u++){if(u%1===0)gl.push(u);}
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="100%" style="overflow:visible">
-    <defs><linearGradient id="rg" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0" stop-color="var(--accent)" stop-opacity=".26"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
-    </linearGradient></defs>
-    ${gl.map(u=>`<line x1="${pad}" x2="${w-pad}" y1="${y(u)}" y2="${y(u)}" stroke="var(--border)" stroke-width="1"/>
-      <text x="6" y="${y(u)+3}" font-size="8.5" fill="var(--ink-3)" font-family="'Chakra Petch',sans-serif">${rankShort(unitsToRank(u))}</text>`).join("")}
-    <polygon points="${x(0)},${h-pad} ${line} ${x(series.length-1)},${h-pad}" fill="url(#rg)"/>
-    <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>
-    ${pts.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${i===pts.length-1?4:2.6}" fill="var(--accent)" ${series[i].live?'stroke="var(--surface)" stroke-width="2"':''}/>
-      <text x="${x(i)}" y="${h-10}" font-size="8.5" fill="var(--ink-3)" text-anchor="middle" font-family="'IBM Plex Mono',monospace">${series[i].live?'now':series[i].date.slice(5)}</text>`).join("")}
-  </svg>`;
+function rankPlayerView(p,a){
+  if(!a.length)return `<div class="panel pad empty">No ranked games tracked for ${esc(p.handle)} yet — ${p.riotId&&p.riotId.name?'run a sync':'add their Riot ID on the Roster tab first'}.</div>`;
+  const s=playerRankStats(a);
+  const first=a[0];
+  const idx=Math.max(0,team().roster.findIndex(x=>x.id===p.id));
+  const lines=[{label:p.handle,color:pColor(idx),pts:a.map(e=>({t:Date.parse(e.playedAt),y:e.elo}))}];
+  const dstr=t=>new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  return `
+    <div class="p111">
+      ${statCard("Current",rankStr(tierRank(s.cur.tierId,s.cur.rr)),"",tierRank(s.cur.tierId,s.cur.rr).rr+" RR")}
+      ${statCard("Tracked record",`${s.wins}<small>–${s.losses}</small>`,"",(s.net>0?'+':'')+s.net+" RR net")}
+      ${statCard("Peak",rankStr(tierRank(s.peak.tierId,s.peak.rr)),"",dstr(s.peak.playedAt))}
+    </div>
+    <div class="panel pad">
+      <div class="eyebrow">${esc(p.handle)} · elo per ranked game</div>
+      ${mmrChart(lines)}
+      <div class="hint" style="margin-top:6px">${a.length} games · ${s.dir>0?`W${s.streak} streak`:s.dir<0?`L${s.streak} streak`:'—'} · since ${dstr(first.playedAt)}</div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>Recent games</h3><span class="hint">latest 25</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Date</th><th>Map</th><th>Rank</th><th class="num">RR</th><th class="num">Δ</th></tr></thead>
+        <tbody>${a.slice(-25).reverse().map(e=>`<tr>
+          <td class="mono">${dstr(e.playedAt)}</td>
+          <td>${esc(e.map||'—')}</td>
+          <td>${rankShort(tierRank(e.tierId,e.rr))}</td>
+          <td class="num">${tierRank(e.tierId,e.rr).rr}</td>
+          <td class="num ${e.lastChange>0?'up':e.lastChange<0?'down':'flat'}">${e.lastChange>0?'+':''}${e.lastChange}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+    </div>`;
 }
 
 /* -------- scrims / officials (same view, filtered by kind) -------- */

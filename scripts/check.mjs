@@ -117,6 +117,7 @@ async function renderViews() {
         if (p === "/api/me") return { user: { id: "u1", email: "ci@test", name: "CI" }, teams: [{ id: "t1", name: "XPE", tag: "XPE", role: "manager" }] };
         if (p === "/api/auth/state") return { needsBootstrap: false };
         if (/^\/api\/teams\/[^/]+$/.test(p)) return JSON.parse(JSON.stringify(fixture));
+        if (/rank-history$/.test(p)) return { history: rankHistoryFixture() };
         if (/invites$/.test(p)) return [];
         return {};
       },
@@ -130,16 +131,34 @@ async function renderViews() {
   for (let i = 0; i < 80; i++) await Promise.resolve(); // let the EOF boot() settle
   if (!ctx.__t || !ctx.__t.getB()) throw new Error("app.js boot() did not load the team bundle");
 
+  ctx.__t.state.rankHist = rankHistoryFixture(); // skip the lazy-load branch in VIEWS_ranks
+
   let rendered = 0;
   for (const v of Object.keys(ctx.__t.VIEWS)) {
     ctx.__t.state.view = v;
-    ctx.__t.render();
-    const html = byId("main")._html;
-    const bad = [...new Set(html.match(/undefined|NaN|\[object Object\]/g) || [])];
-    if (bad.length) fail(`view "${v}": ${bad.join(", ")} in rendered output`);
-    else rendered++;
+    for (const rv of v === "ranks" ? ["team", "p1"] : [null]) {
+      if (rv) ctx.__t.state.rankView = rv;
+      ctx.__t.render();
+      const html = byId("main")._html;
+      const bad = [...new Set(html.match(/undefined|NaN|\[object Object\]/g) || [])];
+      if (bad.length) fail(`view "${v}"${rv ? ` (${rv})` : ""}: ${bad.join(", ")} in rendered output`);
+    }
+    rendered++;
   }
   if (rendered === Object.keys(ctx.__t.VIEWS).length) ok(`all ${rendered} views render clean`);
+}
+
+function rankHistoryFixture() {
+  const day = 86400000;
+  const mk = (pid, i, tierId, rr, chg) => ({
+    playerId: pid, matchId: `${pid}-m${i}`,
+    playedAt: new Date(Date.now() - (12 - i) * day).toISOString(),
+    tierId, tierName: "x", rr, lastChange: chg, elo: (tierId - 3) * 100 + rr, map: "Ascent", season: "e11a5",
+  });
+  return [
+    mk("p1", 1, 24, 10, 20), mk("p1", 2, 24, 30, 20), mk("p1", 3, 24, 12, -18), mk("p1", 4, 25, 5, 21),
+    mk("p2", 1, 23, 80, 15), mk("p2", 2, 24, 4, 19), mk("p2", 3, 24, 25, 21), mk("p2", 4, 24, 8, -17),
+  ];
 }
 
 function teamFixture() {
@@ -174,7 +193,6 @@ function teamFixture() {
         { pid: "p2", agent: "Jett", k: 15, d: 16, a: 4, adr: 145, kast: 66, present: true },
       ],
     }],
-    rankSnapshots: [{ id: "sn1", date: "2026-08-31", note: "x", ranks: { p1: rk("Immortal", 1, 50), p2: rk("Immortal", 2, 15) } }],
     tryouts: [{ id: "t1", date: "2026-08-20", handle: "Ares", role: "Duelist", roles: ["Duelist", "Sentinel"], tier: "Immortal", div: 2, agents: ["Jett"], scores: { mech: 9, util: 6, comms: 6, att: 7 }, verdict: "Shortlist", notes: "aim" }],
     activities: { weeks: {}, months: { "2026-09": { theme: "Qualifier prep", goals: [{ text: "3 scrims/wk", done: false }] } } },
     members: [{ userId: "u1", email: "ci@test", name: "CI", role: "manager", playerId: "p1" }],
