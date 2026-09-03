@@ -61,12 +61,20 @@ async function notifyTeam(c, teamRowOrId, payload) {
   else await p;
 }
 
+// roles: accept a `roles` array (multi-select) or a legacy single `role`;
+// return both the JSON array and roles[0] for the plain `role` column.
+const splitRoles = (b, fallback = "Flex") => {
+  const r = Array.isArray(b.roles) ? b.roles.filter(Boolean) : b.role ? [b.role] : [];
+  return { roles: JSON.stringify(r), role: r[0] || fallback };
+};
+
 // ---------------------------------------------------------------- row mappers
 const rowPlayer = (p) => ({
   id: p.id,
   handle: p.handle,
   name: p.name,
   role: p.role,
+  roles: (() => { const r = J(p.roles, []); return r.length ? r : p.role ? [p.role] : []; })(),
   status: p.status,
   icon: p.icon,
   joined: p.joined,
@@ -518,16 +526,18 @@ app.post("/api/teams/:id/players", team("igl"), async (c) => {
   const id = c.req.param("id");
   const pid = nid(8);
   const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM players WHERE team_id = ?").bind(id).first();
+  const pr = splitRoles(b, "Flex");
   await c.env.DB.prepare(
-    `INSERT INTO players (id,team_id,handle,name,role,status,icon,joined,agents,rank,riot_id,note,sort)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO players (id,team_id,handle,name,role,roles,status,icon,joined,agents,rank,riot_id,note,sort)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   )
     .bind(
       pid,
       id,
       b.handle || "New player",
       b.name || "",
-      b.role || "Flex",
+      pr.role,
+      pr.roles,
       b.status || "Trial",
       b.icon || "🎯",
       b.joined || "",
@@ -566,8 +576,14 @@ app.put("/api/teams/:id/players/:pid", team("player"), async (c) => {
   const vals = [];
   for (const f of allowed) {
     if (!(f in b)) continue;
+    if (f === "role" && "roles" in b) continue; // handled below
     sets.push(`${PLAYER_COL[f]} = ?`);
     vals.push(["agents", "rank", "riotId"].includes(f) ? (b[f] == null ? null : JSON.stringify(b[f])) : b[f]);
+  }
+  if ("roles" in b) {
+    const pr = splitRoles(b, "Flex");
+    sets.push("roles = ?", "role = ?");
+    vals.push(pr.roles, pr.role);
   }
   if (!sets.length) return c.json({ ok: true });
   vals.push(id, pid);
@@ -723,10 +739,7 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
 });
 
 // ================================================================ tryouts
-const tryoutRoles = (b) => {
-  const r = Array.isArray(b.roles) ? b.roles.filter(Boolean) : b.role ? [b.role] : [];
-  return { roles: JSON.stringify(r), role: r[0] || "Flex" };
-};
+const tryoutRoles = (b) => splitRoles(b, "Flex");
 
 app.post("/api/teams/:id/tryouts", team("igl"), async (c) => {
   const b = await readJson(c);

@@ -145,8 +145,8 @@ async function renderViews() {
 function teamFixture() {
   const rk = (tier, div, rr) => ({ tier, div, rr });
   const players = [
-    { id: "p1", handle: "nix", name: "R", role: "IGL", status: "Starter", icon: "🧭", joined: "2025-11-02", agents: ["Killjoy"], rank: rk("Immortal", 1, 55), riotId: { name: "XPE nix", tag: "EUW", region: "" }, rankSyncedAt: Date.now(), note: "", perfNotes: [{ id: "n1", at: Date.now(), byId: "u1", by: "CI", text: "entries on Ascent" }] },
-    { id: "p2", handle: "Sable", name: "L", role: "Duelist", status: "Starter", icon: "🗡️", joined: "2025-11-02", agents: ["Jett"], rank: rk("Immortal", 2, 25), riotId: { name: "XPE Sable", tag: "EUW", region: "" }, rankSyncedAt: null, note: "", perfNotes: [] },
+    { id: "p1", handle: "nix", name: "R", role: "IGL", roles: ["IGL", "Controller"], status: "Starter", icon: "🧭", joined: "2025-11-02", agents: ["Killjoy"], rank: rk("Immortal", 1, 55), riotId: { name: "XPE nix", tag: "EUW", region: "" }, rankSyncedAt: Date.now(), note: "", perfNotes: [{ id: "n1", at: Date.now(), byId: "u1", by: "CI", text: "entries on Ascent" }] },
+    { id: "p2", handle: "Sable", name: "L", role: "Duelist", roles: ["Duelist", "Sentinel"], status: "Starter", icon: "🗡️", joined: "2025-11-02", agents: ["Jett"], rank: rk("Immortal", 2, 25), riotId: { name: "XPE Sable", tag: "EUW", region: "" }, rankSyncedAt: null, note: "", perfNotes: [] },
   ];
   return {
     team: { id: "t1", name: "XPE", tag: "XPE", server: "EU", scrimGoal: { base: 1, tournament: 3 }, tournamentWeeks: ["2026-08-31"], hasRankApiKey: true, hasIngestKey: true, hasDiscord: true, discordRoleId: "1234567890", importPrefix: "XPE", importMin: 3 },

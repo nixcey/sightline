@@ -91,6 +91,7 @@ function toast(msg){const el=document.createElement("div");el.className="toast";
   $("#toast-root").appendChild(el);setTimeout(()=>el.remove(),2200);}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function cap(s){s=String(s||"");return s.charAt(0).toUpperCase()+s.slice(1);}
+function roleStr(x){const r=(x&&x.roles&&x.roles.length?x.roles:(x&&x.role?[x.role]:[]));return r.join(" / ")||"—";}
 
 /* ============================================================ data layer
    All state comes from the API. BUNDLE mirrors the old single-team object so the
@@ -339,7 +340,7 @@ VIEWS_overview=()=>{
               <div style="display:flex;align-items:center;gap:9px">
                 <span style="font-size:16px">${r.p.icon}</span>
                 <div><div style="font-family:var(--disp);font-weight:600">${esc(r.p.handle)}</div>
-                <div class="sub">${esc(r.p.role)} · avg R2.0 ${r.rating.toFixed(2)}</div></div>
+                <div class="sub">${esc(roleStr(r.p))} · avg R2.0 ${r.rating.toFixed(2)}</div></div>
               </div>
               <span class="chip crit">Below ${RATING_BASELINE.toFixed(2)}</span>
             </div>`).join(""):
@@ -438,7 +439,7 @@ VIEWS_roster=()=>{
           ${ps.map(p=>`<div class="pcard">
             <div class="top">
               <div class="ico">${p.icon||'•'}</div>
-              <div style="flex:1"><div class="hd">${esc(p.handle)}</div><div class="rl">${esc(p.role)}</div></div>
+              <div style="flex:1"><div class="hd">${esc(p.handle)}</div><div class="rl">${esc(roleStr(p))}</div></div>
               ${canEdit()&&p.riotId&&p.riotId.name?`<button class="icar" data-sync="${p.id}" title="Sync rank from Riot ID" ${state.syncing?'disabled':''}>⟳</button>`:''}
               ${canEdit()||isMe(p.id)?`<button class="icar" data-edit="${p.id}" title="Edit">✎</button>`:''}
             </div>
@@ -468,16 +469,17 @@ function editPlayer(id){
   const admin=canEdit();
   const mine=isMe(id);
   if(id && !admin && !mine){ toast("You can only edit your own profile"); return; }
-  const p=id?team().roster.find(x=>x.id===id):{handle:"",name:"",role:"Duelist",agents:[],status:"Trial",icon:"🎯",joined:iso(new Date()),rank:{tier:"Ascendant",div:1,rr:0},riotId:{name:"",tag:"",region:""},note:""};
+  const p=id?team().roster.find(x=>x.id===id):{handle:"",name:"",roles:["Duelist"],agents:[],status:"Trial",icon:"🎯",joined:iso(new Date()),rank:{tier:"Ascendant",div:1,rr:0},riotId:{name:"",tag:"",region:""},note:""};
+  const curRoles=(p.roles&&p.roles.length?p.roles:(p.role?[p.role]:[]));
   const rk=p.rank||{tier:"Ascendant",div:1,rr:0};
   const ri=p.riotId||{name:"",tag:"",region:""};
   const fields=[];
   // identity + gameplay prefs: a player may edit their own; roster decisions (status, joined) are admin-only
   fields.push(
-    {name:"handle",label:"Handle",type:"text",value:p.handle,required:true},
-    {name:"name",label:"Real name",type:"text",value:p.name},
-    {row:[{name:"role",label:"Role",type:"select",options:ROLES,value:p.role},
+    {row:[{name:"handle",label:"Handle",type:"text",value:p.handle,required:true},
           {name:"icon",label:"Icon",type:"text",value:p.icon,hint:"emoji"}]},
+    {name:"name",label:"Real name",type:"text",value:p.name},
+    {name:"roles",label:"Roles (tick all that apply)",type:"multiselect",options:ROLES,value:curRoles},
   );
   if(admin){
     fields.push(
@@ -1049,9 +1051,12 @@ function editScrim(id,defKind){
       <span class="hint">YouTube / Twitch URLs — shown as buttons on the match card</span>
       <div id="sf_vods"></div>
       <button class="btn ghost sm" type="button" id="sf_vadd">+ VOD</button></div>
-    <div class="fld"><label>Lineup — K / D / A / ADR / KAST%</label>
+    <div class="fld"><label>Lineup</label>
       <span class="hint">ADR &amp; KAST optional — left blank, Rating 2.0 falls back to an estimate from kills &amp; deaths</span>
-      <div id="sf_lineup" style="overflow-x:auto"></div>
+      <div class="luwrap">
+        <div class="luhead"><span>Player</span><span>Agent</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>KAST</span><span title="Present">P</span><span></span></div>
+        <div id="sf_lineup"></div>
+      </div>
       <button class="btn ghost sm" type="button" id="sf_add">+ Row</button></div>`;
   const vodBox=body.querySelector("#sf_vods");
   const vodRow=(v)=>{const d=document.createElement("div");d.style.cssText="display:flex;gap:6px;margin-bottom:6px";
@@ -1066,16 +1071,16 @@ function editScrim(id,defKind){
   const lu=body.querySelector("#sf_lineup");
   function rowHTML(l){
     const unlinked=!l.pid && l.name;
-    return `<div class="fld" style="flex-direction:row;gap:5px;align-items:center;margin-bottom:6px;min-width:520px" data-row data-name="${esc(l.name||'')}">
-      <select data-f="pid" style="flex:1.2;min-width:88px">${unlinked?`<option value="" selected>— ${esc(l.name)} —</option>`:''}${starters.map(p=>`<option value="${p.id}" ${p.id===l.pid?'selected':''}>${esc(p.handle)}</option>`).join("")}</select>
-      <select data-f="agent" style="flex:1;min-width:82px">${AGENTS.map(a=>`<option ${a===l.agent?'selected':''}>${a}</option>`).join("")}</select>
-      <input data-f="k" type="number" value="${l.k}" style="width:42px" title="Kills">
-      <input data-f="d" type="number" value="${l.d}" style="width:42px" title="Deaths">
-      <input data-f="a" type="number" value="${l.a}" style="width:42px" title="Assists">
-      <input data-f="adr" type="number" value="${l.adr??''}" style="width:48px" placeholder="ADR" title="Avg damage / round">
-      <input data-f="kast" type="number" value="${l.kast??''}" style="width:48px" placeholder="KAST" title="KAST %">
-      <label style="border:0;padding:0" title="Present"><input data-f="present" type="checkbox" ${l.present?'checked':''}></label>
-      <button type="button" class="icar" data-rm>✕</button>
+    return `<div class="lurow" data-row data-name="${esc(l.name||'')}">
+      <select data-f="pid">${unlinked?`<option value="" selected>— ${esc(l.name)} —</option>`:''}${starters.map(p=>`<option value="${p.id}" ${p.id===l.pid?'selected':''}>${esc(p.handle)}</option>`).join("")}</select>
+      <select data-f="agent">${AGENTS.map(a=>`<option ${a===l.agent?'selected':''}>${a}</option>`).join("")}</select>
+      <input data-f="k" type="number" inputmode="numeric" value="${l.k}" title="Kills">
+      <input data-f="d" type="number" inputmode="numeric" value="${l.d}" title="Deaths">
+      <input data-f="a" type="number" inputmode="numeric" value="${l.a}" title="Assists">
+      <input data-f="adr" type="number" inputmode="numeric" value="${l.adr??''}" placeholder="—" title="Avg damage / round">
+      <input data-f="kast" type="number" inputmode="numeric" value="${l.kast??''}" placeholder="—" title="KAST %">
+      <label class="lupres" title="Present"><input data-f="present" type="checkbox" ${l.present?'checked':''}></label>
+      <button type="button" class="icar" data-rm title="Remove">✕</button>
     </div>`;
   }
   function draw(arr){lu.innerHTML=arr.map(rowHTML).join("");
@@ -1105,7 +1110,7 @@ function editScrim(id,defKind){
       kind:body.querySelector("#sf_kind").value,vods:vodList,lineup:rows};
     act(id?API.put(`/api/teams/${TID()}/scrims/${id}`,rec):API.post(`/api/teams/${TID()}/scrims`,rec),
         id?`${cap(rec.kind)} updated`:`${cap(rec.kind)} logged`);
-  },id?()=>act(API.del(`/api/teams/${TID()}/scrims/${id}`),`${cap(kind)} deleted`):null);
+  },id?()=>act(API.del(`/api/teams/${TID()}/scrims/${id}`),`${cap(kind)} deleted`):null,{wide:true});
 }
 
 /* -------- performance -------- */
@@ -1140,7 +1145,7 @@ VIEWS_performance=()=>{
         <thead><tr><th>Player</th><th>Role</th><th>Rank</th><th class="num">Scrims</th><th class="num">Avg KD</th>
         <th class="num">Scrim R2.0</th><th class="num">Δ vs prior</th><th class="num">Off. R2.0</th><th class="num">Off. Δ</th><th>Trend</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>${rows.map(r=>`<tr>
-          <td>${r.p.icon} ${esc(r.p.handle)}</td><td>${esc(r.p.role)}</td>
+          <td>${r.p.icon} ${esc(r.p.handle)}</td><td>${esc(roleStr(r.p))}</td>
           <td class="mono" style="font-size:11px">${fmtRank(r.p.rank)}</td>
           <td class="num">${r.games}</td>
           <td class="num">${r.kd!=null?r.kd.toFixed(2):'—'}</td>
@@ -1333,7 +1338,7 @@ VIEWS_tryouts=()=>{
   M.querySelectorAll("[data-edittry]").forEach(b=>b.onclick=()=>editTryout(b.dataset.edittry));
 };
 function chipScore(k,v){const c=v>=8?'good':v>=6?'':'crit';return `<span class="chip ${c}">${k} ${v}</span>`;}
-function tryoutRoleStr(t){const r=(t.roles&&t.roles.length?t.roles:(t.role?[t.role]:[]));return r.join(" / ")||"—";}
+function tryoutRoleStr(t){return roleStr(t);}
 function editTryout(id){
   if(!canEdit())return;
   const t=id?team().tryouts.find(x=>x.id===id):{handle:"",roles:["Duelist"],tier:"Immortal",div:1,agents:[],date:iso(new Date()),
@@ -1370,7 +1375,7 @@ function modalShell(title,bodyEl,onSubmit,onDel,opts={}){
   const root=$("#modal-root");
   root.innerHTML="";
   const wrap=document.createElement("div");wrap.className="scrim";
-  const modal=document.createElement("div");modal.className="modal";
+  const modal=document.createElement("div");modal.className="modal"+(opts.wide?" wide":"");
   const h=document.createElement("div");h.className="modal-h";
   h.innerHTML=`<h3>${esc(title)}</h3><button class="icar" data-x>✕</button>`;
   const f=document.createElement("div");f.className="modal-f";

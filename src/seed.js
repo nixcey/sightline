@@ -24,10 +24,10 @@ export async function seedTeam(db, teamId) {
     stmts.push(
       db
         .prepare(
-          `INSERT INTO players (id,team_id,handle,name,role,status,icon,joined,agents,rank,riot_id,note,sort)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT INTO players (id,team_id,handle,name,role,roles,status,icon,joined,agents,rank,riot_id,note,sort)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
-        .bind(id, teamId, handle, name, role, status, icon, joined, JSON.stringify(agents.split(",")), JSON.stringify(rank), JSON.stringify(riot), "", i),
+        .bind(id, teamId, handle, name, role, JSON.stringify([role]), status, icon, joined, JSON.stringify(agents.split(",")), JSON.stringify(rank), JSON.stringify(riot), "", i),
     );
   });
 
