@@ -6,15 +6,25 @@ Linux**. Same app as the website — plus, on Windows, it can run the scrim
 
 ## Use it
 
-Grab an installer from the repo's **[Releases](https://github.com/nixcey/sightline/releases)**
+Grab a build from the repo's **[Releases](https://github.com/nixcey/sightline/releases)**
 page:
 
-- **Windows** — `Sightline-Setup-x.y.z.exe` → double-click → next/next/finish.
-  It's unsigned, so Windows SmartScreen shows *"Windows protected your PC"* →
-  **More info → Run anyway** (once).
+- **Windows** — `Sightline-Setup-x.y.z.exe` (installer) or
+  `Sightline-x.y.z-x64.zip` (no installer: unzip, run `Sightline.exe`).
 - **Linux** — `Sightline-x.y.z.AppImage` (right-click → Properties → *Allow
-  executing*, then double-click), or `Sightline-x.y.z.deb` (`sudo dpkg -i` /
-  double-click in a software centre).
+  executing*, double-click) or `Sightline-x.y.z.deb`.
+
+**The builds are unsigned**, which trips two gates on Windows:
+
+1. **Chrome blocks the `.exe` download.** Fixes, easiest first:
+   - `chrome://downloads` → the blocked item → **Keep dangerous file**
+   - download the **`.zip`** instead — rarely blocked
+   - use **Edge** or **Firefox**
+   - PowerShell: `irm <asset URL> -OutFile Sightline.exe`
+2. **SmartScreen** on first run: *"Windows protected your PC"* →
+   **More info → Run anyway** (once per version).
+
+Both go away with a code-signing certificate — see the repo README roadmap.
 
 Sign in as usual. On Windows, **Scrims → Scrim importer** has a *"Run the
 agent on this PC"* section:

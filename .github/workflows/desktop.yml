@@ -49,6 +49,7 @@ jobs:
           if-no-files-found: error
           path: |
             desktop/dist/*.exe
+            desktop/dist/*.zip
             desktop/dist/*.AppImage
             desktop/dist/*.deb
 
@@ -69,12 +70,25 @@ jobs:
           generate_release_notes: true
           name: Sightline Desktop ${{ github.ref_name }}
           body: |
-            Desktop build of Sightline (Windows + Linux).
+            Desktop build of Sightline (Windows + Linux). **Unsigned** — see below.
 
-            - **Windows** — download `Sightline-Setup-*.exe`, run it. Unsigned, so
-              Windows SmartScreen shows a warning → *More info → Run anyway*.
-            - **Linux** — `Sightline-*.AppImage` (mark executable, double-click) or
-              the `.deb`.
+            ### Windows
+            - `Sightline-Setup-*.exe` — installer (Start-menu + desktop shortcut).
+            - `Sightline-*-x64.zip` — no installer: unzip anywhere, run `Sightline.exe`.
 
-            The agent Start/Stop controls appear under **Scrims → Scrim importer**
-            on Windows.
+            **Chrome blocks the download?** It flags unsigned installers with no
+            reputation. Either:
+            - `chrome://downloads` → the blocked item → **Keep dangerous file**, or
+            - grab the **`.zip`** instead (rarely blocked), or
+            - download in Edge / Firefox, or
+            - PowerShell: `irm <asset-url> -OutFile Sightline.exe`
+
+            On first run, **SmartScreen** shows "Windows protected your PC" →
+            *More info → Run anyway* (once per version).
+
+            ### Linux
+            `Sightline-*.AppImage` (mark executable, double-click) or `Sightline-*.deb`.
+
+            ### Using it
+            Sign in as normal. On Windows, **Scrims → Scrim importer** has a
+            Start/Stop panel that runs the scrim agent for you.

@@ -31,16 +31,17 @@
       }
     ],
     "win": {
-      "target": "nsis",
+      "target": ["nsis", "zip"],
       "icon": "icon.png",
-      "artifactName": "Sightline-Setup-${version}.${ext}"
+      "artifactName": "Sightline-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Sightline-Setup-${version}.${ext}"
     },
     "linux": {
       "target": ["AppImage", "deb"],
