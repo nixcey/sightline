@@ -126,7 +126,9 @@ async function act(promise,okMsg){
 }
 
 /* ============================================================ ui state */
-let state={view:"overview",week:mondayOf(new Date()),perfWindow:5,complabMap:"Ascent",tryoutSort:"score",syncing:false};
+const MFILTER_DEF={map:"",opp:"",result:"",margin:"",player:"",agent:"",comp:[],since:""};
+let state={view:"overview",week:mondayOf(new Date()),perfWindow:5,complabMap:"Ascent",tryoutSort:"score",syncing:false,
+  mfilter:{...MFILTER_DEF,comp:[]},mfilterOpen:false};
 
 const NAV=[
   ["overview","Overview",icon("grid")],
@@ -162,6 +164,32 @@ const PERF_WINDOWS=[5,10,15,0];
 const perfN=()=>state.perfWindow||Infinity;
 const perfWindowLabel=()=>state.perfWindow?`rolling ${state.perfWindow} scrims`:"lifetime";
 function scrimsInWeek(mon){const a=iso(mon),b=iso(addDays(mon,7));return matchesOf("scrim").filter(s=>s.date>=a&&s.date<b);}
+/* --- match list filtering (Scrims / Officials tabs) --- */
+function mfCount(){const f=state.mfilter;return ["map","opp","result","margin","player","agent","since"].filter(k=>f[k]).length+(f.comp.length?1:0);}
+function mfClear(){state.mfilter={...MFILTER_DEF,comp:[]};}
+function applyMatchFilter(list){
+  const f=state.mfilter;
+  const days={"30":30,"90":90,"180":180,"365":365}[f.since];
+  const cut=days?iso(addDays(new Date(),-days)):null;
+  const lc=(f.opp||"").toLowerCase();
+  return list.filter(s=>{
+    if(f.map&&s.map!==f.map)return false;
+    if(lc&&!String(s.opp||"").toLowerCase().includes(lc))return false;
+    if(cut&&s.date<cut)return false;
+    const m=(s.rw||0)-(s.rl||0),am=Math.abs(m);
+    if(f.result==="win"&&m<=0)return false;
+    if(f.result==="loss"&&m>=0)return false;
+    if(f.result==="draw"&&m!==0)return false;
+    if(f.margin==="close"&&am>3)return false;
+    if(f.margin==="mid"&&(am<4||am>6))return false;
+    if(f.margin==="big"&&am<7)return false;
+    const ags=(s.lineup||[]).map(l=>l.agent);
+    if(f.agent&&!ags.includes(f.agent))return false;
+    if(f.comp.length&&!f.comp.every(a=>ags.includes(a)))return false;
+    if(f.player&&!(s.lineup||[]).some(l=>l.pid===f.player&&l.present))return false;
+    return true;
+  });
+}
 function isTournamentWeek(mon){return (team().tournamentWeeks||[]).includes(iso(mon));}
 function weekGoal(mon){const g=team().scrimGoal;return isTournamentWeek(mon)?g.tournament:g.base;}
 
@@ -763,23 +791,54 @@ function vodLabel(u){
   try{const h=new URL(u).hostname.replace(/^www\./,"");return /youtu/.test(h)?"YouTube":/twitch/.test(h)?"Twitch":h;}
   catch(e){return "VOD";}
 }
+function matchFilterPanel(kind){
+  const f=state.mfilter,n=mfCount();
+  const roster=team().roster;
+  const sel=(id,cur,opts)=>`<select data-mf="${id}">${opts.map(o=>`<option value="${esc(o.v)}" ${String(o.v)===String(cur)?'selected':''}>${esc(o.t)}</option>`).join("")}</select>`;
+  const maps=[{v:"",t:"Any map"},...MAPS.map(m=>({v:m,t:m}))];
+  const ags=[{v:"",t:"Any agent"},...AGENTS.map(a=>({v:a,t:a}))];
+  const players=[{v:"",t:"Any player"},...roster.map(p=>({v:p.id,t:p.handle}))];
+  return `<details class="panel" id="mfPanel" ${state.mfilterOpen||n?'open':''}>
+    <summary style="cursor:pointer;padding:10px 14px;display:flex;align-items:center;gap:8px;font-weight:600">
+      Filters ${n?`<span class="chip accent">${n}</span>`:''}
+      ${n?`<button class="btn ghost sm" id="mfClear" style="margin-left:auto">Clear</button>`:''}
+    </summary>
+    <div class="panel-b grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+      <div class="fld"><label>Map</label>${sel("map",f.map,maps)}</div>
+      <div class="fld"><label>Opponent</label><input data-mf="opp" value="${esc(f.opp)}" placeholder="name contains…"></div>
+      <div class="fld"><label>Result</label>${sel("result",f.result,[{v:"",t:"Any"},{v:"win",t:"Wins"},{v:"loss",t:"Losses"},{v:"draw",t:"Draws"}])}</div>
+      <div class="fld"><label>Margin</label>${sel("margin",f.margin,[{v:"",t:"Any"},{v:"close",t:"Close (≤3)"},{v:"mid",t:"Clear (4–6)"},{v:"big",t:"Dominant (7+)"}])}</div>
+      <div class="fld"><label>Player featured</label>${sel("player",f.player,players)}</div>
+      <div class="fld"><label>We played agent</label>${sel("agent",f.agent,ags)}</div>
+      <div class="fld"><label>Since</label>${sel("since",f.since,[{v:"",t:"All time"},{v:"30",t:"Last 30 days"},{v:"90",t:"Last 90 days"},{v:"180",t:"Last 6 months"},{v:"365",t:"Last year"}])}</div>
+    </div>
+    <div class="panel-b" style="border-top:1px solid var(--border)">
+      <div class="fld"><label>Our comp includes</label>
+        <div class="checks" id="mfComp">${AGENTS.map(a=>`<label class="${f.comp.includes(a)?'on':''}"><input type="checkbox" value="${a}" ${f.comp.includes(a)?'checked':''}>${a}</label>`).join("")}</div>
+      </div>
+    </div>
+  </details>`;
+}
 function matchListView(kind){
   const off=kind==="official";
-  const list=matchesOf(kind).slice().sort((a,b)=>a.date<b.date?1:-1);
+  const all=matchesOf(kind);
+  const list=applyMatchFilter(all).slice().sort((a,b)=>a.date<b.date?1:-1);
+  const n=mfCount();
   const w=state.week,goal=weekGoal(w),done=scrimsInWeek(w).length;
   const wins=list.filter(s=>s.rw>s.rl).length;
   M.innerHTML=`<div class="grid">
     <div class="p111">
       ${off
-        ? statCard("Officials played",list.length,"","tournament matches")
+        ? statCard("Officials played",n?`${list.length}<small>/${all.length}</small>`:list.length,"",n?"matching filters":"tournament matches")
         : statCard("This week",`${done}<small>/${goal}</small>`,goal?bar(done/goal):"",
             done>=goal?"Goal met":`${goal-done} to go`)}
-      ${statCard(off?"Official record":"Scrim record",`${wins}<small>–${list.length-wins}</small>`,"",
+      ${statCard(n?"Filtered record":(off?"Official record":"Scrim record"),`${wins}<small>–${list.length-wins}</small>`,"",
         list.length?Math.round(wins/list.length*100)+"% win rate":"—")}
-      ${statCard(off?"Logged officials":"Logged scrims",list.length,"","all time")}
+      ${statCard(n?"Matches shown":(off?"Logged officials":"Logged scrims"),n?`${list.length}<small>/${all.length}</small>`:list.length,"",n?"of all logged":"all time")}
     </div>
     ${canEdit()?`<div class="btn-row"><button class="btn" id="addScrim">${icon(off?'trophy':'swords')} Log ${off?'official':'scrim'}</button>
       ${!off&&canManage()?`<button class="btn ghost" id="scrimImport">⬇ Scrim importer</button>`:''}</div>`:''}
+    ${all.length?matchFilterPanel(kind):''}
     <div class="grid">
       ${list.map(s=>{
         const rt=scrimRatings(s);
@@ -809,12 +868,25 @@ function matchListView(kind){
             ${vods.map((u,i)=>`<a class="btn ghost sm" href="${esc(u)}" target="_blank" rel="noopener">▶ ${esc(vodLabel(u))}${vods.length>1?' '+(i+1):''}</a>`).join("")}
           </div>`:''}
         </div>`;
-      }).join("")||`<div class="empty panel pad">No ${off?'officials':'scrims'} logged yet</div>`}
+      }).join("")||`<div class="empty panel pad">${all.length?`No ${off?'officials':'scrims'} match these filters`:`No ${off?'officials':'scrims'} logged yet`}</div>`}
     </div>
   </div>`;
   const asc=$("#addScrim");if(asc)asc.onclick=()=>editScrim(null,kind);
   const si=$("#scrimImport");if(si)si.onclick=importerDialog;
   M.querySelectorAll("[data-editscrim]").forEach(b=>b.onclick=()=>editScrim(b.dataset.editscrim));
+  const panel=$("#mfPanel");
+  if(panel){
+    panel.addEventListener("toggle",()=>{state.mfilterOpen=panel.open;});
+    const clr=$("#mfClear");if(clr)clr.onclick=(e)=>{e.preventDefault();e.stopPropagation();mfClear();render();};
+    panel.querySelectorAll("[data-mf]").forEach(el=>{
+      el.addEventListener("change",()=>{state.mfilter[el.dataset.mf]=el.value;render();});
+    });
+    panel.querySelectorAll("#mfComp input").forEach(cb=>cb.addEventListener("change",()=>{
+      const set=new Set(state.mfilter.comp);
+      cb.checked?set.add(cb.value):set.delete(cb.value);
+      state.mfilter.comp=[...set];render();
+    }));
+  }
 };
 async function importerDialog(){
   if(!canManage())return;
