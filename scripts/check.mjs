@@ -149,20 +149,28 @@ function teamFixture() {
     { id: "p2", handle: "Sable", name: "L", role: "Duelist", status: "Starter", icon: "🗡️", joined: "2025-11-02", agents: ["Jett"], rank: rk("Immortal", 2, 25), riotId: { name: "XPE Sable", tag: "EUW", region: "" }, rankSyncedAt: null, note: "", perfNotes: [] },
   ];
   return {
-    team: { id: "t1", name: "XPE", tag: "XPE", server: "EU", scrimGoal: { base: 1, tournament: 3 }, tournamentWeeks: ["2026-08-31"], hasRankApiKey: true, hasIngestKey: true, importPrefix: "XPE", importMin: 3 },
+    team: { id: "t1", name: "XPE", tag: "XPE", server: "EU", scrimGoal: { base: 1, tournament: 3 }, tournamentWeeks: ["2026-08-31"], hasRankApiKey: true, hasIngestKey: true, hasDiscord: true, importPrefix: "XPE", importMin: 3 },
     myRole: "manager", myPlayerId: null,
     schedule: { winStart: "11:00", winEnd: "24:00", includeSubs: false, blocks: [{ id: "b1", pid: "p1", day: 0, start: "13:00", end: "15:00", label: "Class" }] },
     roster: players,
     scrims: [{
       id: "s1", date: "2026-09-02", opp: "Onyx", map: "Split", rw: 13, rl: 9, matchId: "M1", source: "overwolf",
+      kind: "scrim", vods: ["https://youtu.be/abc123"],
       lineup: [
         { pid: null, name: "ghost#x", agent: "Reyna", k: 5, d: 9, a: 1, adr: 80, kast: 40, present: true },
         { pid: "p1", agent: "Cypher", k: 16, d: 12, a: 9, adr: 150, kast: 72, present: true },
         { pid: "p2", agent: "Raze", k: 21, d: 13, a: 5, adr: 190, kast: 74, present: true },
       ],
+    }, {
+      id: "s2", date: "2026-08-28", opp: "Titans", map: "Ascent", rw: 13, rl: 11, matchId: null, source: null,
+      kind: "official", vods: [],
+      lineup: [
+        { pid: "p1", agent: "Killjoy", k: 18, d: 14, a: 7, adr: 160, kast: 70, present: true },
+        { pid: "p2", agent: "Jett", k: 15, d: 16, a: 4, adr: 145, kast: 66, present: true },
+      ],
     }],
     rankSnapshots: [{ id: "sn1", date: "2026-08-31", note: "x", ranks: { p1: rk("Immortal", 1, 50), p2: rk("Immortal", 2, 15) } }],
-    tryouts: [{ id: "t1", date: "2026-08-20", handle: "Ares", role: "Duelist", tier: "Immortal", div: 2, agents: ["Jett"], scores: { mech: 9, util: 6, comms: 6, att: 7 }, verdict: "Shortlist", notes: "aim" }],
+    tryouts: [{ id: "t1", date: "2026-08-20", handle: "Ares", role: "Duelist", roles: ["Duelist", "Sentinel"], tier: "Immortal", div: 2, agents: ["Jett"], scores: { mech: 9, util: 6, comms: 6, att: 7 }, verdict: "Shortlist", notes: "aim" }],
     activities: { weeks: {}, months: { "2026-09": { theme: "Qualifier prep", goals: [{ text: "3 scrims/wk", done: false }] } } },
     members: [{ userId: "u1", email: "ci@test", name: "CI", role: "manager", playerId: "p1" }],
   };

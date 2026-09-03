@@ -36,11 +36,23 @@ companion app.
 - **Persistence** is only D1. The frontend never touches storage directly — every
   mutation goes through `act(API.…)` then refetches `GET /api/teams/:id` (the
   bundle mirrors the old `team()` object).
-- **Rank sync** and **scrim import** run server-side; their keys live in the
-  `teams` row, never in the bundle (`hasRankApiKey` / `hasIngestKey` booleans).
+- **Rank sync**, **scrim import** and **Discord notifications** run server-side;
+  their secrets live in the `teams` row, never in the bundle (`hasRankApiKey` /
+  `hasIngestKey` / `hasDiscord` booleans).
 - Scrim import (`POST /api/import/match`, bearer = `teams.ingest_key`) dedupes on
   `(team_id, match_id)` and only accepts customs with `import_min`+ players whose
   in-game name matches `import_prefix`.
+- **Matches:** `scrims` rows carry `kind` (`'scrim'` | `'official'`) + a `vods`
+  JSON array. `matchesOf(kind)` in `app.js` filters the bundle; the Scrims and
+  Officials tabs are one `matchListView(kind)`. Officials never count toward the
+  weekly scrim goal; Performance compares the rolling scrim window
+  (`state.perfWindow` = 5/10/15/0-for-lifetime) to the all-time officials average.
+- **Tryouts:** `roles` is a JSON array (multi-select — e.g. Duelist + Sentinel);
+  `role` is kept as `roles[0]` for old callers.
+- **Discord:** `notifyTeam(c, teamRowOrId, payload)` POSTs an embed to
+  `teams.discord_webhook` via `c.executionCtx.waitUntil` (fire-and-forget). Fires
+  on scrim/official logged or imported, activity added, tournament week set.
+  `DISCORD_RE` validates the URL on save.
 
 ## Local dev / deploy
 ```

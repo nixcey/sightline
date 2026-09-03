@@ -90,6 +90,7 @@ async function syncRanks(only){
 function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;
   $("#toast-root").appendChild(el);setTimeout(()=>el.remove(),2200);}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function cap(s){s=String(s||"");return s.charAt(0).toUpperCase()+s.slice(1);}
 
 /* ============================================================ data layer
    All state comes from the API. BUNDLE mirrors the old single-team object so the
@@ -134,6 +135,7 @@ const NAV=[
   ["activities","Activities",icon("checks")],
   ["ranks","Rank Tracking",icon("trend")],
   ["scrims","Scrims",icon("swords")],
+  ["officials","Officials",icon("trophy")],
   ["performance","Performance",icon("pulse")],
   ["complab","Comp Lab",icon("layers")],
   ["tryouts","Tryouts",icon("search")],
@@ -145,13 +147,21 @@ function icon(n){const p={
   checks:'<path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3M12 6h8M12 13h8M12 20h8"/>',
   trend:'<path d="M4 17l6-6 4 4 6-8M16 7h4v4"/>',
   swords:'<path d="M4 4l9 9M14 14l6 6M20 4l-9 9M10 14l-6 6"/>',
+  trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/>',
   pulse:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   layers:'<path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/>',
   search:'<circle cx="10" cy="10" r="6"/><path d="M20 20l-5-5"/>',
+  discord:'<path d="M18 5a16 16 0 0 0-4-1l-.3.6a12 12 0 0 1 3.5 1.8A13 13 0 0 0 6.8 6.4 12 12 0 0 1 10.3 4.6L10 4a16 16 0 0 0-4 1C3.5 9 3 13 3.2 17a16 16 0 0 0 5 2l.8-1.3a10 10 0 0 1-2-1l.5-.4a11 11 0 0 0 9 0l.5.4a10 10 0 0 1-2 1L15 19a16 16 0 0 0 5-2c.3-4.7-.6-8.6-2-12zM9.5 14.5c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7zm5 0c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7z"/>',
 }[n];return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;}
 
 /* ============================================================ analytics */
-function scrimsInWeek(mon){const a=iso(mon),b=iso(addDays(mon,7));return team().scrims.filter(s=>s.date>=a&&s.date<b);}
+const matchKind=(s)=>s.kind||"scrim";
+const matchesOf=(kind)=>team().scrims.filter(s=>matchKind(s)===(kind||"scrim"));
+/* perfWindow: 5/10/15 = rolling N scrims, 0 = lifetime */
+const PERF_WINDOWS=[5,10,15,0];
+const perfN=()=>state.perfWindow||Infinity;
+const perfWindowLabel=()=>state.perfWindow?`rolling ${state.perfWindow} scrims`:"lifetime";
+function scrimsInWeek(mon){const a=iso(mon),b=iso(addDays(mon,7));return matchesOf("scrim").filter(s=>s.date>=a&&s.date<b);}
 function isTournamentWeek(mon){return (team().tournamentWeeks||[]).includes(iso(mon));}
 function weekGoal(mon){const g=team().scrimGoal;return isTournamentWeek(mon)?g.tournament:g.base;}
 
@@ -164,22 +174,27 @@ function scrimRatings(scrim){
       rating:rating20(l.k,l.d,l.a,rounds,adr,kast)};
   });
 }
-function playerRolling(pid,n){
-  const list=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1);
+function playerRolling(pid,n,kind){
+  const list=matchesOf(kind).slice().sort((a,b)=>a.date<b.date?1:-1);
+  const lim=n||Infinity;
   const vals=[];
   for(const s of list){const row=scrimRatings(s).find(r=>r.pid===pid&&r.present);
     if(row&&row.rating!=null){vals.push({date:s.date,rating:row.rating,kd:row.kd,map:s.map});}
-    if(vals.length>=n)break;}
+    if(vals.length>=lim)break;}
   return vals;
 }
 function performanceTable(n){
+  const lifetime=!n;
   return team().roster.filter(p=>p.status==="Starter"||p.status==="Sub").map(p=>{
-    const cur=playerRolling(p.id,n);
-    const prev=playerRolling(p.id,n*2).slice(n,n*2);
+    const cur=playerRolling(p.id,n,"scrim");
+    const prev=lifetime?[]:playerRolling(p.id,n*2,"scrim").slice(n,n*2);
+    const off=playerRolling(p.id,0,"official");
     const a=mean(cur.map(v=>v.rating));
     const pv=mean(prev.map(v=>v.rating));
+    const offA=mean(off.map(v=>v.rating));
     const kd=mean(cur.map(v=>v.kd));
     return {p,games:cur.length,rating:a,prevRating:pv,delta:(a!=null&&pv!=null)?a-pv:null,kd,
+      offGames:off.length,offRating:offA,offDelta:(a!=null&&offA!=null)?offA-a:null,
       flag:a!=null&&a<RATING_BASELINE,trend:cur.map(v=>v.rating).reverse()};
   }).sort((x,y)=>(x.rating??9)-(y.rating??9));
 }
@@ -189,12 +204,12 @@ function teamRank(includeSubs){
   return avgRank(ps.map(p=>p.rank));
 }
 function attendanceRate(pid,lastN){
-  const list=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,lastN||99);
+  const list=matchesOf("scrim").slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,lastN||99);
   let tot=0,pres=0;list.forEach(s=>{const l=s.lineup.find(x=>x.pid===pid);if(l){tot++;if(l.present)pres++;}});
   return tot?pres/tot:null;
 }
 function bestAgentsForMap(map){
-  const rows=team().scrims.filter(s=>s.map===map).flatMap(s=>{
+  const rows=matchesOf("scrim").filter(s=>s.map===map).flatMap(s=>{
     const rt=scrimRatings(s);const win=s.rw>s.rl;
     return rt.filter(r=>r.present).map(r=>({pid:r.pid,agent:r.agent,win,rating:r.rating??RATING_BASELINE}));
   });
@@ -270,12 +285,12 @@ VIEWS_overview=()=>{
   const lastSnap=snaps[snaps.length-1];
   const prevAvg=lastSnap?avgRank(starters.map(p=>lastSnap.ranks[p.id])):null;
   const rDelta=(tr&&prevAvg)?rankUnits(tr)-rankUnits(prevAvg):0;
-  const att=(()=>{const list=team().scrims.slice(-5);let tot=0,p=0;list.forEach(s=>s.lineup.forEach(l=>{tot++;if(l.present)p++;}));return tot?p/tot:null;})();
+  const att=(()=>{const list=matchesOf("scrim").slice(-5);let tot=0,p=0;list.forEach(s=>s.lineup.forEach(l=>{tot++;if(l.present)p++;}));return tot?p/tot:null;})();
   const wk=team().activities.weeks[iso(mon)];
   let nextAct=null;
   if(wk)for(const d of DAYS){for(const it of (wk[d]||[])){nextAct=nextAct||{d,...it};}}
   const fs=freeSolve();
-  const recent=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,5);
+  const recent=matchesOf("scrim").slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,5);
 
   M.innerHTML=`
   <div class="grid">
@@ -289,7 +304,7 @@ VIEWS_overview=()=>{
     </div>
     <div class="p31">
       <div class="panel">
-        <div class="panel-h"><h3>Focus list</h3><span class="hint">rolling ${state.perfWindow} scrims</span></div>
+        <div class="panel-h"><h3>Focus list</h3><span class="hint">${perfWindowLabel()}</span></div>
         <div class="panel-b">
           ${flagged.length?flagged.map(r=>`
             <div class="rowline">
@@ -300,7 +315,7 @@ VIEWS_overview=()=>{
               </div>
               <span class="chip crit">Below ${RATING_BASELINE.toFixed(2)}</span>
             </div>`).join(""):
-            `<div class="callout good">No starter is averaging below ${RATING_BASELINE.toFixed(2)} Rating 2.0 over the last ${state.perfWindow} scrims.</div>`}
+            `<div class="callout good">No starter is averaging below ${RATING_BASELINE.toFixed(2)} Rating 2.0 (${perfWindowLabel()}).</div>`}
           <div style="margin-top:12px"><button class="btn ghost sm" data-go="performance">Open performance →</button></div>
         </div>
       </div>
@@ -741,24 +756,34 @@ function rankChart(series){
   </svg>`;
 }
 
-/* -------- scrims -------- */
-VIEWS_scrims=()=>{
-  const list=team().scrims.slice().sort((a,b)=>a.date<b.date?1:-1);
+/* -------- scrims / officials (same view, filtered by kind) -------- */
+VIEWS_scrims=()=>matchListView("scrim");
+VIEWS_officials=()=>matchListView("official");
+function vodLabel(u){
+  try{const h=new URL(u).hostname.replace(/^www\./,"");return /youtu/.test(h)?"YouTube":/twitch/.test(h)?"Twitch":h;}
+  catch(e){return "VOD";}
+}
+function matchListView(kind){
+  const off=kind==="official";
+  const list=matchesOf(kind).slice().sort((a,b)=>a.date<b.date?1:-1);
   const w=state.week,goal=weekGoal(w),done=scrimsInWeek(w).length;
   const wins=list.filter(s=>s.rw>s.rl).length;
   M.innerHTML=`<div class="grid">
     <div class="p111">
-      ${statCard("This week",`${done}<small>/${goal}</small>`,goal?bar(done/goal):"",
-        done>=goal?"Goal met":`${goal-done} to go`)}
-      ${statCard("Scrim record",`${wins}<small>–${list.length-wins}</small>`,"",
+      ${off
+        ? statCard("Officials played",list.length,"","tournament matches")
+        : statCard("This week",`${done}<small>/${goal}</small>`,goal?bar(done/goal):"",
+            done>=goal?"Goal met":`${goal-done} to go`)}
+      ${statCard(off?"Official record":"Scrim record",`${wins}<small>–${list.length-wins}</small>`,"",
         list.length?Math.round(wins/list.length*100)+"% win rate":"—")}
-      ${statCard("Logged scrims",list.length,"","all time")}
+      ${statCard(off?"Logged officials":"Logged scrims",list.length,"","all time")}
     </div>
-    ${canEdit()?`<div class="btn-row"><button class="btn" id="addScrim">${icon('swords')} Log scrim</button>
-      ${canManage()?`<button class="btn ghost" id="scrimImport">⬇ Scrim importer</button>`:''}</div>`:''}
+    ${canEdit()?`<div class="btn-row"><button class="btn" id="addScrim">${icon(off?'trophy':'swords')} Log ${off?'official':'scrim'}</button>
+      ${!off&&canManage()?`<button class="btn ghost" id="scrimImport">⬇ Scrim importer</button>`:''}</div>`:''}
     <div class="grid">
       ${list.map(s=>{
         const rt=scrimRatings(s);
+        const vods=(s.vods||[]).filter(Boolean);
         return `<div class="panel">
           <div class="panel-h">
             <h3>${esc(s.map)} · vs ${esc(s.opp)}</h3>
@@ -780,11 +805,14 @@ VIEWS_scrims=()=>{
               <td>${r.present?'<span class="chip good">✓</span>':'<span class="chip crit">✕</span>'}</td>
             </tr>`).join("")}</tbody>
           </table></div>
+          ${vods.length?`<div class="panel-b" style="display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid var(--border)">
+            ${vods.map((u,i)=>`<a class="btn ghost sm" href="${esc(u)}" target="_blank" rel="noopener">▶ ${esc(vodLabel(u))}${vods.length>1?' '+(i+1):''}</a>`).join("")}
+          </div>`:''}
         </div>`;
-      }).join("")||`<div class="empty panel pad">No scrims logged yet</div>`}
+      }).join("")||`<div class="empty panel pad">No ${off?'officials':'scrims'} logged yet</div>`}
     </div>
   </div>`;
-  const asc=$("#addScrim");if(asc)asc.onclick=()=>editScrim();
+  const asc=$("#addScrim");if(asc)asc.onclick=()=>editScrim(null,kind);
   const si=$("#scrimImport");if(si)si.onclick=importerDialog;
   M.querySelectorAll("[data-editscrim]").forEach(b=>b.onclick=()=>editScrim(b.dataset.editscrim));
 };
@@ -889,27 +917,47 @@ function wireDesktopAgent(body){
   auto.onchange=()=>D.agent.setAutostart(auto.checked).then(paint);
   body.querySelector("#ag_logclear").onclick=()=>{ logEl.textContent=""; };
 }
-function editScrim(id){
+function editScrim(id,defKind){
   const ex=id?team().scrims.find(s=>s.id===id):null;
+  const kind=ex?(ex.kind||"scrim"):(defKind||"scrim");
+  const noun=kind==="official"?"official":"scrim";
   const starters=team().roster.filter(p=>p.status==="Starter"||p.status==="Sub");
   const lineup=ex?ex.lineup:starters.filter(p=>p.status==="Starter").map(p=>({pid:p.id,agent:p.agents[0]||AGENTS[0],k:0,d:0,a:0,adr:null,kast:null,present:true}));
+  const vods=ex&&ex.vods&&ex.vods.length?ex.vods.slice():[""];
   const body=document.createElement("div");
   body.className="modal-b";
   body.innerHTML=`
     <div class="fld row2">
+      <div class="fld"><label>Type</label><select id="sf_kind">
+        <option value="scrim" ${kind==="scrim"?'selected':''}>Scrim</option>
+        <option value="official" ${kind==="official"?'selected':''}>Official (tournament)</option>
+      </select></div>
       <div class="fld"><label>Date</label><input type="date" id="sf_date" value="${ex?ex.date:iso(new Date())}"></div>
-      <div class="fld"><label>Opponent</label><input id="sf_opp" value="${ex?esc(ex.opp):''}"></div>
     </div>
     <div class="fld row2">
+      <div class="fld"><label>Opponent</label><input id="sf_opp" value="${ex?esc(ex.opp):''}"></div>
       <div class="fld"><label>Map</label><select id="sf_map">${MAPS.map(m=>`<option ${ex&&ex.map===m?'selected':''}>${m}</option>`).join("")}</select></div>
-      <div class="fld"><label>Score (us – them)</label>
-        <div style="display:flex;gap:6px"><input type="number" id="sf_rw" value="${ex?ex.rw:13}" style="width:50%">
-        <input type="number" id="sf_rl" value="${ex?ex.rl:0}" style="width:50%"></div></div>
     </div>
+    <div class="fld">
+      <label>Score (us – them)</label>
+      <div style="display:flex;gap:6px"><input type="number" id="sf_rw" value="${ex?ex.rw:13}" style="width:80px">
+      <input type="number" id="sf_rl" value="${ex?ex.rl:0}" style="width:80px"></div></div>
+    <div class="fld"><label>VOD links</label>
+      <span class="hint">YouTube / Twitch URLs — shown as buttons on the match card</span>
+      <div id="sf_vods"></div>
+      <button class="btn ghost sm" type="button" id="sf_vadd">+ VOD</button></div>
     <div class="fld"><label>Lineup — K / D / A / ADR / KAST%</label>
       <span class="hint">ADR &amp; KAST optional — left blank, Rating 2.0 falls back to an estimate from kills &amp; deaths</span>
       <div id="sf_lineup" style="overflow-x:auto"></div>
       <button class="btn ghost sm" type="button" id="sf_add">+ Row</button></div>`;
+  const vodBox=body.querySelector("#sf_vods");
+  const vodRow=(v)=>{const d=document.createElement("div");d.style.cssText="display:flex;gap:6px;margin-bottom:6px";
+    d.innerHTML=`<input data-vod type="url" placeholder="https://youtu.be/…" value="${esc(v||'')}" style="flex:1">
+      <button type="button" class="icar" data-vrm>✕</button>`;
+    d.querySelector("[data-vrm]").onclick=()=>d.remove();
+    return d;};
+  vods.forEach(v=>vodBox.appendChild(vodRow(v)));
+  body.querySelector("#sf_vadd").onclick=()=>vodBox.appendChild(vodRow(""));
   const lu=body.querySelector("#sf_lineup");
   function rowHTML(l){
     const unlinked=!l.pid && l.name;
@@ -930,7 +978,7 @@ function editScrim(id){
   draw(lineup);
   body.querySelector("#sf_add").onclick=()=>{const div=document.createElement("div");div.innerHTML=rowHTML({pid:starters[0].id,agent:AGENTS[0],k:0,d:0,a:0,adr:null,kast:null,present:true});
     const node=div.firstElementChild;node.querySelector("[data-rm]").onclick=()=>node.remove();lu.appendChild(node);};
-  modalShell(id?"Edit scrim":"Log scrim",body,()=>{
+  modalShell(id?`Edit ${noun}`:`Log ${noun}`,body,()=>{
     const gv=(r,f)=>{const v=r.querySelector('[data-f='+f+']').value;return v===''?null:+v;};
     const rows=[...lu.querySelectorAll("[data-row]")].map(r=>{
       const pid=r.querySelector('[data-f=pid]').value;
@@ -946,50 +994,61 @@ function editScrim(id){
         present:r.querySelector('[data-f=present]').checked,
       };
     });
+    const vodList=[...body.querySelectorAll("[data-vod]")].map(i=>i.value.trim()).filter(Boolean);
     const rec={date:body.querySelector("#sf_date").value,opp:body.querySelector("#sf_opp").value||"TBD",
-      map:body.querySelector("#sf_map").value,rw:+body.querySelector("#sf_rw").value,rl:+body.querySelector("#sf_rl").value,lineup:rows};
+      map:body.querySelector("#sf_map").value,rw:+body.querySelector("#sf_rw").value,rl:+body.querySelector("#sf_rl").value,
+      kind:body.querySelector("#sf_kind").value,vods:vodList,lineup:rows};
     act(id?API.put(`/api/teams/${TID()}/scrims/${id}`,rec):API.post(`/api/teams/${TID()}/scrims`,rec),
-        id?"Scrim updated":"Scrim logged");
-  },id?()=>act(API.del(`/api/teams/${TID()}/scrims/${id}`),"Scrim deleted"):null);
+        id?`${cap(rec.kind)} updated`:`${cap(rec.kind)} logged`);
+  },id?()=>act(API.del(`/api/teams/${TID()}/scrims/${id}`),`${cap(kind)} deleted`):null);
 }
 
 /* -------- performance -------- */
 VIEWS_performance=()=>{
   const n=state.perfWindow;
+  const wl=perfWindowLabel();
   const rows=performanceTable(n);
   const focus=rows.filter(r=>r.flag);
   const rated=rows.filter(r=>r.rating!=null);
   const rosterAvg=mean(rated.map(r=>r.rating));
+  const offRated=rows.filter(r=>r.offRating!=null);
+  const offAvg=mean(offRated.map(r=>r.offRating));
   const tr=teamRank();
+  const dcell=(d)=>`<td class="num ${d==null?'flat':d>0?'up':d<0?'down':'flat'}">${d!=null?(d>0?'+':'')+d.toFixed(2):'—'}</td>`;
   M.innerHTML=`<div class="grid">
     <div class="p111">
       ${statCard("Team rank",tr?rankStr(tr):"—",tr?`<span class="d flat">${tr.rr} RR</span>`:"","Average of starters' live ranks")}
-      ${statCard("Roster avg R2.0",rosterAvg!=null?rosterAvg.toFixed(2):"—","","Rolling last "+n+" scrims")}
-      ${statCard("Below baseline",focus.length,"",`< ${RATING_BASELINE.toFixed(2)} Rating 2.0`)}
+      ${statCard("Roster avg R2.0",rosterAvg!=null?rosterAvg.toFixed(2):"—","",cap(wl)+" · scrims")}
+      ${statCard("Officials avg R2.0",offAvg!=null?offAvg.toFixed(2):"—",
+        (offAvg!=null&&rosterAvg!=null)?`<span class="d ${offAvg-rosterAvg>0.02?'up':offAvg-rosterAvg<-0.02?'down':'flat'}">${(offAvg-rosterAvg>0?'+':'')+(offAvg-rosterAvg).toFixed(2)} vs scrims</span>`:"",
+        "All tournament matches")}
     </div>
     <div class="btn-row">
-      <span class="chip">Rolling window</span>
-      ${[3,4,5].map(w=>`<button class="btn ${w===n?'':'ghost'} sm" data-win="${w}">${w} scrims</button>`).join("")}
+      <span class="chip">Scrim window</span>
+      ${PERF_WINDOWS.map(w=>`<button class="btn ${w===n?'':'ghost'} sm" data-win="${w}">${w?w+' scrims':'Lifetime'}</button>`).join("")}
     </div>
-    ${focus.length?`<div class="callout warn">Below ${RATING_BASELINE.toFixed(2)} Rating 2.0 over the last ${n} scrims: ${focus.map(r=>`${esc(r.p.handle)} (${r.rating.toFixed(2)}${r.delta!=null?', '+(r.delta>0?'+':'')+r.delta.toFixed(2)+' vs prior':''})`).join(" · ")}</div>`:
-      `<div class="callout good">No player is below ${RATING_BASELINE.toFixed(2)} Rating 2.0 over the last ${n} scrims.</div>`}
+    ${focus.length?`<div class="callout warn">Below ${RATING_BASELINE.toFixed(2)} Rating 2.0 (${wl}): ${focus.map(r=>`${esc(r.p.handle)} (${r.rating.toFixed(2)}${r.delta!=null?', '+(r.delta>0?'+':'')+r.delta.toFixed(2)+' vs prior':''})`).join(" · ")}</div>`:
+      `<div class="callout good">No player is below ${RATING_BASELINE.toFixed(2)} Rating 2.0 (${wl}).</div>`}
     <div class="panel">
-      <div class="panel-h"><h3>Player form</h3><span class="hint">Rating 2.0 · rolling ${n} scrims</span></div>
+      <div class="panel-h"><h3>Player form</h3><span class="hint">Rating 2.0 · scrims ${wl} vs officials</span></div>
       <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Player</th><th>Role</th><th>Rank</th><th class="num">Games</th><th class="num">Avg KD</th>
-        <th class="num">Avg R2.0</th><th class="num">Δ vs prior</th><th>Trend</th><th>Status</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Player</th><th>Role</th><th>Rank</th><th class="num">Scrims</th><th class="num">Avg KD</th>
+        <th class="num">Scrim R2.0</th><th class="num">Δ vs prior</th><th class="num">Off. R2.0</th><th class="num">Off. Δ</th><th>Trend</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>${rows.map(r=>`<tr>
           <td>${r.p.icon} ${esc(r.p.handle)}</td><td>${esc(r.p.role)}</td>
           <td class="mono" style="font-size:11px">${fmtRank(r.p.rank)}</td>
           <td class="num">${r.games}</td>
           <td class="num">${r.kd!=null?r.kd.toFixed(2):'—'}</td>
           <td class="num ${r.rating==null?'':r.rating>=1.10?'up':r.rating<RATING_BASELINE?'down':''}">${r.rating!=null?r.rating.toFixed(2):'—'}</td>
-          <td class="num ${r.delta==null?'flat':r.delta>0?'up':r.delta<0?'down':'flat'}">${r.delta!=null?(r.delta>0?'+':'')+r.delta.toFixed(2):'—'}</td>
+          ${dcell(r.delta)}
+          <td class="num ${r.offRating==null?'':r.offRating>=1.10?'up':r.offRating<RATING_BASELINE?'down':''}">${r.offRating!=null?r.offRating.toFixed(2):'—'}<span style="color:var(--ink-3);font-size:10px"> ${r.offGames||0}g</span></td>
+          ${dcell(r.offDelta)}
           <td>${miniSpark(r.trend)}</td>
           <td>${r.flag?'<span class="chip crit">Focus</span>':r.rating>=1.10?'<span class="chip good">Above avg</span>':'<span class="chip">Around avg</span>'}</td>
           <td><button class="btn ghost sm" data-notes="${r.p.id}">${(r.p.perfNotes||[]).length?`${r.p.perfNotes.length} note${r.p.perfNotes.length>1?'s':''}`:(canEdit()||isMe(r.p.id)?'+ add':'—')}</button></td>
         </tr>`).join("")}</tbody>
       </table></div>
+      <div class="panel-b hint" style="border-top:1px solid var(--border)">Off. Δ = officials R2.0 minus scrim R2.0 — positive means the player steps up in tournament matches.</div>
     </div>
     <div class="p31">
       <div class="panel">
@@ -1005,7 +1064,7 @@ VIEWS_performance=()=>{
         <div class="panel-b sub" style="font-size:12px">
           <p class="mono" style="font-size:11px;color:var(--ink-2)">R = 0.0073·KAST + 0.3591·KPR − 0.5329·DPR + 0.2372·Impact + 0.0032·ADR + 0.1587</p>
           <p class="mono" style="font-size:11px;color:var(--ink-2)">Impact = 2.13·KPR + 0.42·APR − 0.41</p>
-          <p>Per-round rates from the scrim's total rounds (K/D/A ÷ rounds). Community-derived HLTV coefficients; <b>1.00 ≈ an average player</b>. Δ compares this window to the ${n} scrims before it.</p>
+          <p>Per-round rates from the match's total rounds (K/D/A ÷ rounds). Community-derived HLTV coefficients; <b>1.00 ≈ an average player</b>. Δ vs prior compares this scrim window to the ${n||'—'} scrims before it (n/a for lifetime).</p>
         </div>
       </div>
     </div>
@@ -1066,7 +1125,7 @@ function miniSpark(vals){
 VIEWS_complab=()=>{
   const map=state.complabMap;
   const data=bestAgentsForMap(map);
-  const played=team().scrims.filter(s=>s.map===map);
+  const played=matchesOf("scrim").filter(s=>s.map===map);
   const mapWins=played.filter(s=>s.rw>s.rl).length;
   const expWr=data.filter(d=>d.best).reduce((s,d)=>s+d.best.wr,0)/(data.filter(d=>d.best).length||1);
   M.innerHTML=`<div class="grid">
@@ -1101,7 +1160,7 @@ VIEWS_complab=()=>{
       <div class="panel-h"><h3>Map pool overview</h3></div>
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Map</th><th class="num">Scrims</th><th class="num">Win rate</th><th>Sample</th></tr></thead>
-        <tbody>${MAPS.map(m=>{const g=team().scrims.filter(s=>s.map===m);const wn=g.filter(s=>s.rw>s.rl).length;
+        <tbody>${MAPS.map(m=>{const g=matchesOf("scrim").filter(s=>s.map===m);const wn=g.filter(s=>s.rw>s.rl).length;
           return `<tr><td>${m}</td><td class="num">${g.length}</td>
           <td class="num ${g.length&&wn/g.length>=.5?'up':g.length?'down':''}">${g.length?Math.round(wn/g.length*100)+'%':'—'}</td>
           <td><span class="chip ${g.length>=4?'good':g.length>=2?'warn':'crit'}">${g.length>=4?'4+ games':g.length>=2?'2–3 games':g.length===1?'1 game':'none'}</span></td></tr>`;
@@ -1134,7 +1193,7 @@ VIEWS_tryouts=()=>{
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
         ${top.map((t,i)=>`<div class="pcard cut">
           <div class="top"><div class="ico">${['①','②','③'][i]}</div>
-          <div style="flex:1"><div class="hd">${esc(t.handle)}</div><div class="rl">${esc(t.role)} · ${t.tier} ${t.div}</div></div></div>
+          <div style="flex:1"><div class="hd">${esc(t.handle)}</div><div class="rl">${esc(tryoutRoleStr(t))} · ${t.tier} ${t.div}</div></div></div>
           <div class="stat"><span class="k">Composite</span><span class="v">${t.composite.toFixed(1)}<small>/10</small></span></div>
           <div>${chipScore("Mech",t.scores.mech)}${chipScore("Util",t.scores.util)}${chipScore("Comms",t.scores.comms)}${chipScore("Att",t.scores.att)}</div>
           <span class="chip ${t.verdict==='Shortlist'?'good':t.verdict==='Signed'?'accent':'warn'}">${t.verdict}</span>
@@ -1149,7 +1208,7 @@ VIEWS_tryouts=()=>{
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
             <div>
               <div style="font-family:var(--disp);font-weight:700;font-size:15px">${esc(t.handle)}
-                <span class="sub" style="font-weight:400">· ${esc(t.role)} · ${t.tier} ${t.div} · ${t.date}</span></div>
+                <span class="sub" style="font-weight:400">· ${esc(tryoutRoleStr(t))} · ${t.tier} ${t.div} · ${t.date}</span></div>
               <div class="agents" style="margin:6px 0">${t.agents.map(a=>`<span class="chip">${esc(a)}</span>`).join("")}</div>
               <div>${chipScore("Mech",t.scores.mech)}${chipScore("Util",t.scores.util)}${chipScore("Comms",t.scores.comms)}${chipScore("Att",t.scores.att)}
               <span class="chip accent">Σ ${t.composite.toFixed(1)}</span></div>
@@ -1169,16 +1228,18 @@ VIEWS_tryouts=()=>{
   M.querySelectorAll("[data-edittry]").forEach(b=>b.onclick=()=>editTryout(b.dataset.edittry));
 };
 function chipScore(k,v){const c=v>=8?'good':v>=6?'':'crit';return `<span class="chip ${c}">${k} ${v}</span>`;}
+function tryoutRoleStr(t){const r=(t.roles&&t.roles.length?t.roles:(t.role?[t.role]:[]));return r.join(" / ")||"—";}
 function editTryout(id){
   if(!canEdit())return;
-  const t=id?team().tryouts.find(x=>x.id===id):{handle:"",role:"Duelist",tier:"Immortal",div:1,agents:[],date:iso(new Date()),
+  const t=id?team().tryouts.find(x=>x.id===id):{handle:"",roles:["Duelist"],tier:"Immortal",div:1,agents:[],date:iso(new Date()),
     scores:{mech:5,util:5,comms:5,att:5},verdict:"Hold",notes:""};
+  const curRoles=(t.roles&&t.roles.length?t.roles:(t.role?[t.role]:[]));
   openForm({title:id?"Edit tryout · "+t.handle:"Log tryout",del:id?()=>act(API.del(`/api/teams/${TID()}/tryouts/${id}`),"Tryout removed"):null,fields:[
     {row:[{name:"handle",label:"Handle",type:"text",value:t.handle,required:true},
           {name:"date",label:"Date",type:"date",value:t.date}]},
-    {row:[{name:"role",label:"Role tried",type:"select",options:ROLES,value:t.role},
-          {name:"tier",label:"Peak tier",type:"select",options:RANK_TIERS,value:t.tier}]},
-    {name:"div",label:"Division",type:"select",options:[1,2,3],value:t.div},
+    {name:"roles",label:"Roles tried (tick all that apply)",type:"multiselect",options:ROLES,value:curRoles},
+    {row:[{name:"tier",label:"Peak tier",type:"select",options:RANK_TIERS,value:t.tier},
+          {name:"div",label:"Division",type:"select",options:[1,2,3],value:t.div}]},
     {name:"agents",label:"Agents played",type:"multiselect",options:AGENTS,value:t.agents},
     {row:[{name:"mech",label:"Mechanics /10",type:"number",value:t.scores.mech,min:1,max:10},
           {name:"util",label:"Utility /10",type:"number",value:t.scores.util,min:1,max:10}]},
@@ -1187,7 +1248,7 @@ function editTryout(id){
     {name:"verdict",label:"Verdict",type:"select",options:VERDICTS,value:t.verdict},
     {name:"notes",label:"Commentary",type:"textarea",value:t.notes},
   ]},d=>{
-    const rec={handle:d.handle,date:d.date,role:d.role,tier:d.tier,div:+d.div,agents:d.agents,
+    const rec={handle:d.handle,date:d.date,roles:d.roles,role:d.roles[0]||"Flex",tier:d.tier,div:+d.div,agents:d.agents,
       scores:{mech:+d.mech,util:+d.util,comms:+d.comms,att:+d.att},verdict:d.verdict,notes:d.notes};
     act(id?API.put(`/api/teams/${TID()}/tryouts/${id}`,rec):API.post(`/api/teams/${TID()}/tryouts`,rec),
         id?"Tryout updated":"Tryout logged");
@@ -1195,7 +1256,7 @@ function editTryout(id){
 }
 
 const VIEWS={overview:VIEWS_overview,roster:VIEWS_roster,schedule:VIEWS_schedule,activities:VIEWS_activities,
-  ranks:VIEWS_ranks,scrims:VIEWS_scrims,performance:VIEWS_performance,complab:VIEWS_complab,tryouts:VIEWS_tryouts};
+  ranks:VIEWS_ranks,scrims:VIEWS_scrims,officials:VIEWS_officials,performance:VIEWS_performance,complab:VIEWS_complab,tryouts:VIEWS_tryouts};
 
 /* ============================================================ generic form modal */
 let _closeModal=()=>{};
@@ -1478,6 +1539,7 @@ function accountDialog(){
     <div class="fld"><label>Role on ${esc(team().name)}</label><div style="text-transform:capitalize">${esc(myRole())}</div></div>
     ${canManage()?`<button class="btn ghost" id="acc_invite">Invite a member</button>`:''}
     ${canManage()?`<button class="btn ghost" id="acc_members">Manage members</button>`:''}
+    ${canManage()?`<button class="btn ghost" id="acc_discord">${icon('discord')} Discord notifications${team().hasDiscord?' <span class="chip good" style="margin-left:6px">on</span>':''}</button>`:''}
     ${isOwner()?`<button class="btn ghost" id="acc_delteam" style="color:var(--crit);border-color:var(--crit)">Delete team</button>`:''}
     <button class="btn ghost" id="acc_logout">Sign out</button>`;
   modalShell("Account",body,null,null,{noSave:true});
@@ -1500,11 +1562,44 @@ function accountDialog(){
   };
   const iv=body.querySelector("#acc_invite"); if(iv)iv.onclick=()=>{closeModal();inviteDialog();};
   const m=body.querySelector("#acc_members"); if(m)m.onclick=()=>{closeModal();membersDialog();};
+  const dc=body.querySelector("#acc_discord"); if(dc)dc.onclick=()=>{closeModal();discordDialog();};
   const dl=body.querySelector("#acc_delteam"); if(dl)dl.onclick=async()=>{
     if(!confirm(`Delete "${team().name}" and all its data? This cannot be undone.`))return;
     try{ await API.del(`/api/teams/${TID()}`); location.reload(); }catch(e){toast(e.message);}
   };
   body.querySelector("#acc_logout").onclick=async()=>{ await API.post("/api/auth/logout"); location.reload(); };
+}
+function discordDialog(){
+  if(!canManage())return;
+  const connected=team().hasDiscord;
+  const body=document.createElement("div");body.className="modal-b";
+  body.innerHTML=`
+    <p class="sub" style="margin:0">Post team activity to a Discord channel — scrims &amp; officials logged or imported, new schedule activities, tournament weeks. Uses an <b>incoming webhook</b>: in Discord open <b>Channel → Edit → Integrations → Webhooks → New Webhook</b>, then <b>Copy Webhook URL</b>.</p>
+    <div class="fld"><label>Webhook URL</label>
+      <input id="dc_url" type="url" autocomplete="off" placeholder="https://discord.com/api/webhooks/…"
+        value="${connected?'':''}">
+      ${connected?'<span class="hint">A webhook is saved (hidden). Paste a new URL to replace it, or disconnect below.</span>':''}</div>
+    <div class="btn-row">
+      <button class="btn" id="dc_save">${connected?'Replace':'Connect'}</button>
+      ${connected?`<button class="btn ghost" id="dc_test">Send test message</button>`:''}
+      ${connected?`<button class="btn ghost" id="dc_off" style="color:var(--crit);border-color:var(--crit)">Disconnect</button>`:''}
+    </div>`;
+  modalShell("Discord notifications",body,null,null,{noSave:true});
+  const val=()=>body.querySelector("#dc_url").value.trim();
+  body.querySelector("#dc_save").onclick=async()=>{
+    if(!val())return toast("Paste a webhook URL");
+    try{ await API.put(`/api/teams/${TID()}/discord`,{webhook:val()}); await reload(); toast("Discord connected"); closeModal(); discordDialog(); }
+    catch(e){ toast(e.message); }
+  };
+  const tb=body.querySelector("#dc_test"); if(tb)tb.onclick=async()=>{
+    try{ await API.post(`/api/teams/${TID()}/discord/test`,{}); toast("Test message sent to Discord"); }
+    catch(e){ toast(e.message); }
+  };
+  const ob=body.querySelector("#dc_off"); if(ob)ob.onclick=async()=>{
+    if(!confirm("Disconnect Discord notifications?"))return;
+    try{ await API.put(`/api/teams/${TID()}/discord`,{webhook:""}); await reload(); toast("Discord disconnected"); closeModal(); }
+    catch(e){ toast(e.message); }
+  };
 }
 function inviteLink(code){ return `${location.origin}/#/join/${code}`; }
 function copyText(t,silent){

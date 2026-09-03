@@ -24,6 +24,28 @@ const readJson = async (c) => {
 };
 const bad = (c, msg, code = 400) => c.json({ error: msg }, code);
 
+// ---------------------------------------------------------------- Discord notifications
+const DISCORD_RE = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+/;
+const COLOR = { good: 0x3ad1bf, bad: 0xf0656e, gold: 0xe7a343, accent: 0xff4655, grey: 0x767c86 };
+async function discordSend(webhook, payload) {
+  if (!webhook || !DISCORD_RE.test(webhook)) return false;
+  try {
+    const r = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    return r.ok;
+  } catch { return false; }
+}
+async function notifyTeam(c, teamRowOrId, payload) {
+  let webhook = teamRowOrId && typeof teamRowOrId === "object" ? teamRowOrId.discord_webhook : null;
+  if (webhook == null) {
+    const t = await c.env.DB.prepare("SELECT discord_webhook FROM teams WHERE id = ?").bind(teamRowOrId).first();
+    webhook = t && t.discord_webhook;
+  }
+  if (!webhook) return;
+  const p = discordSend(webhook, payload);
+  if (c.executionCtx && c.executionCtx.waitUntil) c.executionCtx.waitUntil(p);
+  else await p;
+}
+
 // ---------------------------------------------------------------- row mappers
 const rowPlayer = (p) => ({
   id: p.id,
@@ -50,12 +72,15 @@ const rowScrim = (s) => ({
   lineup: J(s.lineup, []),
   matchId: s.match_id || null,
   source: s.source || "manual",
+  kind: s.kind || "scrim",
+  vods: J(s.vods, []),
 });
 const rowTryout = (t) => ({
   id: t.id,
   date: t.date,
   handle: t.handle,
   role: t.role,
+  roles: (() => { const r = J(t.roles, []); return r.length ? r : t.role ? [t.role] : []; })(),
   tier: t.tier,
   div: t.div,
   agents: J(t.agents, []),
@@ -292,6 +317,7 @@ app.get("/api/teams/:id", team("player"), async (c) => {
       tournamentWeeks: J(t.tournament_weeks, []),
       hasRankApiKey: !!t.rank_api_key,
       hasIngestKey: !!t.ingest_key,
+      hasDiscord: !!t.discord_webhook,
       importPrefix: t.import_prefix || t.tag,
       importMin: t.import_min ?? 3,
     },
@@ -328,8 +354,21 @@ app.put("/api/teams/:id", team("igl"), async (c) => {
   if ("importPrefix" in b) put("import_prefix", String(b.importPrefix || "").trim());
   if ("importMin" in b) put("import_min", Math.max(1, Math.min(5, Math.round(Number(b.importMin) || 3))));
   if (!sets.length) return c.json({ ok: true });
-  vals.push(c.req.param("id"));
+  const id = c.req.param("id");
+
+  let newTournyWeeks = null;
+  if ("tournamentWeeks" in b) {
+    const prev = await c.env.DB.prepare("SELECT tournament_weeks FROM teams WHERE id = ?").bind(id).first();
+    const before = new Set(J(prev.tournament_weeks, []));
+    newTournyWeeks = (b.tournamentWeeks || []).filter((w) => !before.has(w));
+  }
+
+  vals.push(id);
   await c.env.DB.prepare(`UPDATE teams SET ${sets.join(", ")} WHERE id=?`).bind(...vals).run();
+
+  for (const w of newTournyWeeks || []) {
+    await notifyTeam(c, id, { embeds: [{ title: "◆ Tournament week", description: `The week of **${w}** is now a tournament week.`, color: COLOR.gold }] });
+  }
   return c.json({ ok: true });
 });
 
@@ -369,6 +408,23 @@ app.post("/api/teams/:id/ingest-key", team("igl"), async (c) => {
 app.delete("/api/teams/:id/ingest-key", team("igl"), async (c) => {
   await c.env.DB.prepare("UPDATE teams SET ingest_key = '' WHERE id = ?").bind(c.req.param("id")).run();
   return c.json({ ok: true });
+});
+
+// ---- Discord webhook for team notifications ----
+app.put("/api/teams/:id/discord", team("igl"), async (c) => {
+  const b = await readJson(c);
+  const webhook = String(b.webhook || "").trim();
+  if (webhook && !DISCORD_RE.test(webhook)) return bad(c, "that isn't a Discord webhook URL");
+  await c.env.DB.prepare("UPDATE teams SET discord_webhook = ? WHERE id = ?").bind(webhook, c.req.param("id")).run();
+  return c.json({ ok: true, connected: !!webhook });
+});
+app.post("/api/teams/:id/discord/test", team("igl"), async (c) => {
+  const t = await c.env.DB.prepare("SELECT discord_webhook, name FROM teams WHERE id = ?").bind(c.req.param("id")).first();
+  if (!t.discord_webhook) return bad(c, "no webhook set — save one first");
+  const ok = await discordSend(t.discord_webhook, {
+    embeds: [{ title: "✅ Sightline connected", description: `Notifications for **${t.name}** will post here.`, color: COLOR.good }],
+  });
+  return ok ? c.json({ ok: true }) : bad(c, "Discord rejected the webhook (deleted or wrong URL?)");
 });
 
 // ================================================================ members + invites
@@ -537,20 +593,33 @@ app.delete("/api/teams/:id/players/:pid/notes/:noteId", team("player"), async (c
 });
 
 // ================================================================ scrims
+const scrimKind = (v) => (v === "official" ? "official" : "scrim");
+const cleanVods = (v) => (Array.isArray(v) ? v.map((u) => String(u || "").trim()).filter(Boolean).slice(0, 8) : []);
+
 app.post("/api/teams/:id/scrims", team("igl"), async (c) => {
   const b = await readJson(c);
+  const id = c.req.param("id");
   const sid = nid(8);
-  await c.env.DB.prepare("INSERT INTO scrims (id,team_id,date,opp,map,rw,rl,lineup,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
-    .bind(sid, c.req.param("id"), b.date, b.opp || "TBD", b.map, +b.rw || 0, +b.rl || 0, JSON.stringify(b.lineup || []), now())
+  const kind = scrimKind(b.kind);
+  const rw = +b.rw || 0, rl = +b.rl || 0;
+  await c.env.DB.prepare("INSERT INTO scrims (id,team_id,date,opp,map,rw,rl,lineup,kind,vods,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(sid, id, b.date, b.opp || "TBD", b.map, rw, rl, JSON.stringify(b.lineup || []), kind, JSON.stringify(cleanVods(b.vods)), now())
     .run();
+  await notifyTeam(c, id, {
+    embeds: [{
+      title: `${kind === "official" ? "🏆 Official" : "⚔️ Scrim"} · ${b.map} vs ${b.opp || "TBD"}`,
+      description: `**${rw}–${rl}** ${rw > rl ? "win" : rw < rl ? "loss" : "draw"}`,
+      color: rw > rl ? COLOR.good : rw < rl ? COLOR.bad : COLOR.grey,
+    }],
+  });
   return c.json({ id: sid });
 });
 
 app.put("/api/teams/:id/scrims/:sid", team("igl"), async (c) => {
   const b = await readJson(c);
   const { id, sid } = c.req.param();
-  await c.env.DB.prepare("UPDATE scrims SET date=?, opp=?, map=?, rw=?, rl=?, lineup=? WHERE team_id=? AND id=?")
-    .bind(b.date, b.opp || "TBD", b.map, +b.rw || 0, +b.rl || 0, JSON.stringify(b.lineup || []), id, sid)
+  await c.env.DB.prepare("UPDATE scrims SET date=?, opp=?, map=?, rw=?, rl=?, lineup=?, kind=?, vods=? WHERE team_id=? AND id=?")
+    .bind(b.date, b.opp || "TBD", b.map, +b.rw || 0, +b.rl || 0, JSON.stringify(b.lineup || []), scrimKind(b.kind), JSON.stringify(cleanVods(b.vods)), id, sid)
     .run();
   return c.json({ ok: true });
 });
@@ -625,25 +694,20 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
 });
 
 // ================================================================ tryouts
+const tryoutRoles = (b) => {
+  const r = Array.isArray(b.roles) ? b.roles.filter(Boolean) : b.role ? [b.role] : [];
+  return { roles: JSON.stringify(r), role: r[0] || "Flex" };
+};
+
 app.post("/api/teams/:id/tryouts", team("igl"), async (c) => {
   const b = await readJson(c);
   const tid = nid(8);
+  const { roles, role } = tryoutRoles(b);
   await c.env.DB.prepare(
-    "INSERT INTO tryouts (id,team_id,date,handle,role,tier,div,agents,scores,verdict,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO tryouts (id,team_id,date,handle,role,roles,tier,div,agents,scores,verdict,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
   )
-    .bind(
-      tid,
-      c.req.param("id"),
-      b.date,
-      b.handle || "",
-      b.role || "Flex",
-      b.tier || "Immortal",
-      +b.div || 1,
-      JSON.stringify(b.agents || []),
-      JSON.stringify(b.scores || {}),
-      b.verdict || "Hold",
-      b.notes || "",
-    )
+    .bind(tid, c.req.param("id"), b.date, b.handle || "", role, roles, b.tier || "Immortal", +b.div || 1,
+      JSON.stringify(b.agents || []), JSON.stringify(b.scores || {}), b.verdict || "Hold", b.notes || "")
     .run();
   return c.json({ id: tid });
 });
@@ -651,22 +715,12 @@ app.post("/api/teams/:id/tryouts", team("igl"), async (c) => {
 app.put("/api/teams/:id/tryouts/:tid", team("igl"), async (c) => {
   const b = await readJson(c);
   const { id, tid } = c.req.param();
+  const { roles, role } = tryoutRoles(b);
   await c.env.DB.prepare(
-    "UPDATE tryouts SET date=?, handle=?, role=?, tier=?, div=?, agents=?, scores=?, verdict=?, notes=? WHERE team_id=? AND id=?",
+    "UPDATE tryouts SET date=?, handle=?, role=?, roles=?, tier=?, div=?, agents=?, scores=?, verdict=?, notes=? WHERE team_id=? AND id=?",
   )
-    .bind(
-      b.date,
-      b.handle || "",
-      b.role || "Flex",
-      b.tier || "Immortal",
-      +b.div || 1,
-      JSON.stringify(b.agents || []),
-      JSON.stringify(b.scores || {}),
-      b.verdict || "Hold",
-      b.notes || "",
-      id,
-      tid,
-    )
+    .bind(b.date, b.handle || "", role, roles, b.tier || "Immortal", +b.div || 1,
+      JSON.stringify(b.agents || []), JSON.stringify(b.scores || {}), b.verdict || "Hold", b.notes || "", id, tid)
     .run();
   return c.json({ ok: true });
 });
@@ -707,11 +761,26 @@ app.put("/api/teams/:id/schedule/mine", team("player"), async (c) => {
 // ================================================================ activities
 app.put("/api/teams/:id/activities/weeks/:wk", team("igl"), async (c) => {
   const b = await readJson(c);
+  const { id, wk } = c.req.param();
+  const data = b.data || {};
+
+  // notify Discord for any newly-added items (compare item ids against the stored week)
+  const prev = await c.env.DB.prepare("SELECT data FROM activities_weeks WHERE team_id = ? AND week_key = ?").bind(id, wk).first();
+  const oldIds = new Set(Object.values(J(prev && prev.data, {})).flat().map((x) => x && x.id));
+  const added = [];
+  for (const [day, items] of Object.entries(data)) for (const it of items || []) if (it && it.id && !oldIds.has(it.id)) added.push({ day, ...it });
+
   await c.env.DB.prepare(
     "INSERT INTO activities_weeks (team_id,week_key,data) VALUES (?,?,?) ON CONFLICT(team_id,week_key) DO UPDATE SET data = excluded.data",
   )
-    .bind(c.req.param("id"), c.req.param("wk"), JSON.stringify(b.data || {}))
+    .bind(id, wk, JSON.stringify(data))
     .run();
+
+  for (const it of added) {
+    await notifyTeam(c, id, {
+      embeds: [{ title: `📅 ${it.day} ${it.time || ""} · ${it.title}`.trim(), description: it.type || "", color: COLOR.accent }],
+    });
+  }
   return c.json({ ok: true });
 });
 
@@ -849,7 +918,15 @@ app.post("/api/import/match", async (c) => {
     throw e;
   }
 
-  return c.json({ imported: true, scrimId: sid, matched: lineup.length - unmatched.length, unmatched, swapped });
+  const matched = lineup.length - unmatched.length;
+  await notifyTeam(c, t, {
+    embeds: [{
+      title: `⚔️ Scrim imported · ${String(b.map)} vs ${opp}`,
+      description: `**${rw}–${rl}** ${rw > rl ? "win" : rw < rl ? "loss" : "draw"} · ${matched} player${matched === 1 ? "" : "s"} matched`,
+      color: rw > rl ? COLOR.good : rw < rl ? COLOR.bad : COLOR.grey,
+    }],
+  });
+  return c.json({ imported: true, scrimId: sid, matched, unmatched, swapped });
 });
 
 app.all("/api/*", (c) => c.json({ error: "not found" }, 404));

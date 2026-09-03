@@ -1,8 +1,9 @@
 # Sightline
 
 A Valorant esports team operations tracker — roster & ranks, unified free-time
-scheduling, activity planning, scrim performance (HLTV Rating 2.0), comp analysis,
-tryout ranking. Multi-team, multi-user, role-based.
+scheduling, activity planning, scrim & official-match performance (HLTV Rating
+2.0), comp analysis, tryout ranking, optional Discord notifications. Multi-team,
+multi-user, role-based.
 
 - **Frontend** — vanilla JS (`public/`), no build step
 - **API** — Cloudflare Worker + [Hono](https://hono.dev) (`src/`)
@@ -18,12 +19,12 @@ manager can **delete the team**. A team always keeps at least one manager.
 
 | Area | admin (manager / igl) | player |
 |---|:-:|:-:|
-| Team settings, rank API key, scrim-import key & filter | ✅ | — |
+| Team settings, rank API key, scrim-import key & filter, Discord webhook | ✅ | — |
 | Members, invites | ✅ | — |
 | Delete the team | manager only | — |
 | Roster: add/remove, status, joined date | ✅ | — |
 | Roster: own handle, name, role, icon, agents, Riot ID, rank, notes | ✅ | own only |
-| Scrims, rank snapshots, tryouts, rank sync, activities, tournament weeks | ✅ | — |
+| Scrims, officials, rank snapshots, tryouts, rank sync, activities, tournament weeks | ✅ | — |
 | Schedule: active window, other players' blocks | ✅ | — |
 | Schedule: **own** availability blocks | ✅ | ✅ |
 | Performance notes on a player | ✅ | own only |
@@ -111,16 +112,30 @@ R      = 0.0073·KAST + 0.3591·KPR − 0.5329·DPR + 0.2372·Impact + 0.0032·A
 Impact = 2.13·KPR + 0.42·APR − 0.41
 ```
 
-Per-round rates come from the scrim's total rounds. Log ADR + KAST per player for
+Per-round rates come from the match's total rounds. Log ADR + KAST per player for
 an exact number; leave them blank and the rating falls back to an estimate.
+
+The **Performance** tab shows a rolling scrim window (5 / 10 / 15 / lifetime)
+side by side with each player's **officials** average, so you can see who steps
+up in tournament matches. Matches carry a `kind` (`scrim` | `official`);
+officials get their own tab and never count toward the weekly scrim goal.
+
+## Discord notifications
+
+Each team can set an incoming-webhook URL (Account → Discord notifications).
+When set, the Worker posts an embed on: a scrim/official logged or imported, a
+new activity added to the week, and a week marked as a tournament week. Webhook
+delivery is fire-and-forget (`c.executionCtx.waitUntil`); the URL lives in the
+`teams` row and is never sent to the browser (`hasDiscord` boolean only).
 
 ## Data model
 
 `teams` → each has `players`, `scrims`, `rank_snapshots`, `tryouts`,
 `activities_weeks`, `activities_months`, a JSON `schedule` column, and
 `team_members` (user ↔ role ↔ optional linked player). Nested structures
-(lineups, agent pools, score breakdowns, schedule blocks) are JSON columns.
-See `migrations/0001_init.sql`.
+(lineups, agent pools, score breakdowns, schedule blocks, scrim VOD links,
+tryout roles) are JSON columns. `scrims.kind` separates officials from scrims;
+`teams.discord_webhook` holds the notification URL. See `migrations/`.
 
 ## Project layout
 
