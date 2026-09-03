@@ -8,9 +8,15 @@ sends the full scoreboard to Sightline as a scrim — no manual entry.
 - Every match carries a unique `pseudo_match_id`. Sightline rejects a second
   import of the same id, so **a match can never be imported twice** — safe to run
   it on more than one PC if you want redundancy.
-- Players are matched to your roster by **Riot ID** (`Name#TAG`). Set each
-  player's Riot ID in Sightline → Roster. Anyone unmatched is imported as an
-  "unlinked" row you can attach later by editing the scrim.
+- **Not every custom is a scrim.** Only customs with at least *N* players whose
+  in-game name starts with your prefix (e.g. `XPE`) on one team are imported. Set
+  *N* and the prefix in Sightline → Scrims → Scrim importer; the app pulls them
+  on connect. If Overwolf mislabels which team is yours, Sightline swaps sides
+  and flips the score automatically.
+- Players are matched to your roster by **Riot ID** (`Name#TAG`) — set each roster
+  player's Riot ID to their *full* in-game name **including the prefix**
+  (`XPE nix#EUW`). Anyone unmatched imports as an "unlinked" row you attach later
+  by editing the scrim.
 
 ## Install (development / unpacked)
 

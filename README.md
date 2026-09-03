@@ -13,19 +13,22 @@ One Worker serves both the static frontend and the `/api/*` JSON API.
 
 ## Roles
 
-| Area | manager | igl | player |
-|---|:-:|:-:|:-:|
-| Team settings (name, region, scrim goals) | ✅ | ✅ | — |
-| Rank API key · ingest key · members · invites · delete team | ✅ | — | — |
-| Roster: add/remove, status, joined date | ✅ | ✅ | — |
-| Roster: own handle, name, role, icon, agents, Riot ID, rank, notes | ✅ | ✅ | own only |
-| Scrims, rank snapshots, tryouts, rank sync | ✅ | ✅ | — |
-| Activities (week plan, month focus/goals), tournament weeks | ✅ | ✅ | — |
-| Schedule: active window, other players' blocks | ✅ | ✅ | — |
-| Schedule: **own** availability blocks | ✅ | ✅ | ✅ |
-| Performance notes on a player | ✅ | ✅ | own only |
-| Own account (name, email, password) | ✅ | ✅ | ✅ |
-| View everything on the team | ✅ | ✅ | ✅ |
+**manager** and **igl** are both full admins. The only difference: only a
+manager can **delete the team**. A team always keeps at least one manager.
+
+| Area | admin (manager / igl) | player |
+|---|:-:|:-:|
+| Team settings, rank API key, scrim-import key & filter | ✅ | — |
+| Members, invites | ✅ | — |
+| Delete the team | manager only | — |
+| Roster: add/remove, status, joined date | ✅ | — |
+| Roster: own handle, name, role, icon, agents, Riot ID, rank, notes | ✅ | own only |
+| Scrims, rank snapshots, tryouts, rank sync, activities, tournament weeks | ✅ | — |
+| Schedule: active window, other players' blocks | ✅ | — |
+| Schedule: **own** availability blocks | ✅ | ✅ |
+| Performance notes on a player | ✅ | own only |
+| Own account (name, email, password) | ✅ | ✅ |
+| View everything on the team | ✅ | ✅ |
 
 Server enforces every write by role; the UI just hides what you can't do.
 
@@ -110,10 +113,19 @@ legacy/           the original single-file localStorage version (v1)
 
 The IGL runs the `overwolf/` companion app. When a Valorant **custom game** ends
 it sends the whole scoreboard to `POST /api/import/match`, authenticated by a
-per-team **ingest key** (Scrims → Scrim importer → generate). Players are matched
-to the roster by Riot ID; the match's `pseudo_match_id` is stored so the same
-match is **never imported twice** (a repeat returns `{imported:false,
-reason:"already imported"}`). See `overwolf/README.md`.
+per-team **ingest key** (Scrims → Scrim importer → generate).
+
+- **Not every custom is a scrim.** A game is only imported when at least
+  `import_min` (default 3) players whose in-game name starts with the team's
+  `import_prefix` (default = tag, e.g. `XPE`) are on one team. If that team is the
+  one Overwolf labelled as the enemy, sides and score are swapped.
+- Players are matched to the roster by **Riot ID** — set each roster player's
+  Riot ID to their *full* in-game name including the prefix (`XPE nix#EUW`).
+  Unmatched players import as "unlinked" rows you attach later.
+- The match's `pseudo_match_id` is stored, so the same match is **never imported
+  twice** — a repeat returns `{imported:false, reason:"already imported"}`.
+
+See `overwolf/README.md`.
 
 ## Roadmap
 
