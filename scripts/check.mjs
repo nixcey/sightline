@@ -154,8 +154,13 @@ function teamFixture() {
     schedule: { winStart: "11:00", winEnd: "24:00", includeSubs: false, blocks: [{ id: "b1", pid: "p1", day: 0, start: "13:00", end: "15:00", label: "Class" }] },
     roster: players,
     scrims: [{
-      id: "s1", date: "2026-09-02", opp: "Onyx", map: "Split", rw: 13, rl: 9, matchId: "M1", source: "overwolf",
+      id: "s1", date: "2026-09-02", opp: "Imported scrim", map: "Split", rw: 13, rl: 9, matchId: "M1", source: "overwolf",
       kind: "scrim", vods: ["https://youtu.be/abc123"],
+      enemy: [
+        { name: "NRG demon1", agent: "Jett", k: 20, d: 14, a: 3, adr: 170 },
+        { name: "NRG s0m", agent: "Omen", k: 15, d: 15, a: 8, adr: 140 },
+        { name: "NRG FNS", agent: "Fade", k: 9, d: 16, a: 12, adr: 95 },
+      ],
       lineup: [
         { pid: null, name: "ghost#x", agent: "Reyna", k: 5, d: 9, a: 1, adr: 80, kast: 40, present: true },
         { pid: "p1", agent: "Cypher", k: 16, d: 12, a: 9, adr: 150, kast: 72, present: true },

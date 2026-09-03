@@ -89,6 +89,7 @@ const rowScrim = (s) => ({
   source: s.source || "manual",
   kind: s.kind || "scrim",
   vods: J(s.vods, []),
+  enemy: J(s.enemy, []),
 });
 const rowTryout = (t) => ({
   id: t.id,

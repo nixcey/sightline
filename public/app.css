@@ -137,6 +137,12 @@ details.panel>summary::-webkit-details-marker{display:none}
 details.panel>summary::before{content:"▸";color:var(--ink-3);margin-right:4px}
 details.panel[open]>summary::before{content:"▾"}
 details.panel[open]>summary{border-bottom:1px solid var(--border)}
+.enemybd{border-top:1px solid var(--border)}
+.enemybd>summary{list-style:none;cursor:pointer;padding:10px 16px;font-family:var(--disp);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.enemybd>summary::-webkit-details-marker{display:none}
+.enemybd>summary::before{content:"▸ ";color:var(--ink-3)}
+.enemybd[open]>summary::before{content:"▾ "}
+.enemybd .hint{text-transform:none;letter-spacing:0}
 .panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border)}
 .panel-h h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase}
 .panel-h .hint{font-family:var(--mono);font-size:11px;color:var(--ink-3)}

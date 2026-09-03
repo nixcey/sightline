@@ -791,6 +791,31 @@ function vodLabel(u){
   try{const h=new URL(u).hostname.replace(/^www\./,"");return /youtu/.test(h)?"YouTube":/twitch/.test(h)?"Twitch":h;}
   catch(e){return "VOD";}
 }
+/* most common leading token across enemy names — a hint for naming an import */
+function commonTag(names){
+  const c={};
+  (names||[]).forEach(n=>{const t=String(n||"").trim().split(/[\s#._-]+/)[0];
+    if(t&&t.length>=2&&t.length<=6)c[t]=(c[t]||0)+1;});
+  let best=null,bn=0;for(const[t,k]of Object.entries(c))if(k>bn){bn=k;best=t;}
+  return bn>=3?best:null;
+}
+function enemyRows(e){
+  return e.map(x=>`<tr><td>${esc(x.name||'—')}</td><td>${esc(x.agent||'—')}</td>
+    <td class="num">${x.k??'—'}</td><td class="num">${x.d??'—'}</td><td class="num">${x.a??'—'}</td>
+    <td class="num">${x.adr!=null?Math.round(x.adr):'—'}</td></tr>`).join("");
+}
+function enemyBoard(s){
+  const e=(s.enemy||[]).filter(x=>x&&(x.name||x.agent));
+  if(!e.length)return "";
+  const unnamed=!s.opp||s.opp==="Imported scrim"||s.opp==="TBD";
+  const tag=unnamed?commonTag(e.map(x=>x.name)):null;
+  return `<details class="enemybd">
+    <summary>Enemy scoreboard <span class="hint">${e.length} players${tag?` · likely <b>${esc(tag)}</b>`:''}</span></summary>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Enemy</th><th>Agent</th><th class="num">K</th><th class="num">D</th><th class="num">A</th><th class="num">ADR</th></tr></thead>
+      <tbody>${enemyRows(e)}</tbody>
+    </table></div></details>`;
+}
 function matchFilterPanel(kind){
   const f=state.mfilter,n=mfCount();
   const roster=team().roster;
@@ -864,6 +889,7 @@ function matchListView(kind){
               <td>${r.present?'<span class="chip good">✓</span>':'<span class="chip crit">✕</span>'}</td>
             </tr>`).join("")}</tbody>
           </table></div>
+          ${enemyBoard(s)}
           ${vods.length?`<div class="panel-b" style="display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid var(--border)">
             ${vods.map((u,i)=>`<a class="btn ghost sm" href="${esc(u)}" target="_blank" rel="noopener">▶ ${esc(vodLabel(u))}${vods.length>1?' '+(i+1):''}</a>`).join("")}
           </div>`:''}
@@ -1010,6 +1036,11 @@ function editScrim(id,defKind){
       <div class="fld"><label>Opponent</label><input id="sf_opp" value="${ex?esc(ex.opp):''}"></div>
       <div class="fld"><label>Map</label><select id="sf_map">${MAPS.map(m=>`<option ${ex&&ex.map===m?'selected':''}>${m}</option>`).join("")}</select></div>
     </div>
+    ${ex&&(ex.enemy||[]).length?`<div class="fld"><label>Enemy scoreboard (from the import)</label>
+      ${(()=>{const tg=commonTag(ex.enemy.map(x=>x.name));return tg?`<span class="hint">Common tag: <b>${esc(tg)}</b> — tap to use it as the opponent name</span> <button type="button" class="btn ghost sm" id="sf_usetag">Use "${esc(tg)}"</button>`:'<span class="hint">No shared clan tag detected</span>';})()}
+      <div class="tbl-wrap" style="margin-top:6px"><table class="tbl">
+        <thead><tr><th>Enemy</th><th>Agent</th><th class="num">K</th><th class="num">D</th><th class="num">A</th><th class="num">ADR</th></tr></thead>
+        <tbody>${enemyRows(ex.enemy)}</tbody></table></div></div>`:''}
     <div class="fld">
       <label>Score (us – them)</label>
       <div style="display:flex;gap:6px"><input type="number" id="sf_rw" value="${ex?ex.rw:13}" style="width:80px">
@@ -1030,6 +1061,8 @@ function editScrim(id,defKind){
     return d;};
   vods.forEach(v=>vodBox.appendChild(vodRow(v)));
   body.querySelector("#sf_vadd").onclick=()=>vodBox.appendChild(vodRow(""));
+  const useTag=body.querySelector("#sf_usetag");
+  if(useTag)useTag.onclick=()=>{body.querySelector("#sf_opp").value=commonTag(ex.enemy.map(x=>x.name))||"";};
   const lu=body.querySelector("#sf_lineup");
   function rowHTML(l){
     const unlinked=!l.pid && l.name;
