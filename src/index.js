@@ -207,7 +207,7 @@ app.post("/api/invites/:code/accept", async (c) => {
   if (!email || !b.password || !b.name) return bad(c, "name, email and password are required");
   if (b.password.length < 8) return bad(c, "password must be at least 8 characters");
   if (await c.env.DB.prepare("SELECT 1 FROM users WHERE email = ?").bind(email).first())
-    return bad(c, "an account with that email exists — sign in, then redeem the code", 409);
+    return bad(c, "an account with that email already exists", 409);
   const { hash, salt } = await auth.hashPassword(b.password);
   const uid = nid(8);
   await c.env.DB.prepare("INSERT INTO users (id,email,name,pw_hash,pw_salt,created_at) VALUES (?,?,?,?,?,?)")

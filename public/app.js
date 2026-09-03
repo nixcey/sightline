@@ -1193,9 +1193,11 @@ function openForm({title,fields,del},onSubmit){
       body.append(r);
     }else body.append(mkField(fd));
   });
-  body.querySelectorAll(".checks label").forEach(l=>l.onclick=e=>{
-    if(e.target.tagName!=="INPUT"){const cb=l.querySelector("input");cb.checked=!cb.checked;}
-    setTimeout(()=>l.classList.toggle("on",l.querySelector("input").checked));
+  body.querySelectorAll(".checks input[type=checkbox]").forEach(cb=>{
+    const lbl=cb.closest("label");
+    const sync=()=>lbl.classList.toggle("on",cb.checked);
+    sync();
+    cb.addEventListener("change",sync); // label click natively toggles the box -> change fires -> sync the chip
   });
   modalShell(title,body,()=>{
     const data={};
@@ -1342,10 +1344,30 @@ async function renderJoin(code){
   f.push({label:"Password (min 8)",name:"password",type:"password",required:true,autocomplete:"new-password"});
   f.push({label:"Confirm password",name:"password2",type:"password",required:true,autocomplete:"new-password"});
   showGate(`<p class="gatelede">You've been invited to <b>${esc(iv.teamName)}</b> as <b>${esc(iv.role)}</b>.</p>`+
-    gateForm(f,"Create account & join",null));
+    gateForm(f,"Create account & join",null)+
+    `<p class="gatehint">Already have a Sightline account? <a href="#" id="join_signin">Sign in to join instead</a>.</p>`);
+  const goSignIn=()=>joinSignIn(code,iv,(new FormData($("#gateform")).get("email"))||iv.email||"");
+  $("#join_signin").onclick=(e)=>{e.preventDefault();goSignIn();};
   bindGateForm(async d=>{
     if(d.password!==d.password2) throw new Error("Passwords don't match");
-    const r=await API.post(`/api/invites/${encodeURIComponent(code)}/accept`,d);
+    try{
+      await API.post(`/api/invites/${encodeURIComponent(code)}/accept`,d);
+      clearJoinHash(); await boot();
+    }catch(e){
+      if(e.status===409){ joinSignIn(code,iv,d.email||iv.email||""); return; }
+      throw e;
+    }
+  });
+}
+/* invitee already has an account -> sign in, then redeem the code */
+function joinSignIn(code,iv,email){
+  showGate(`<p class="gatelede">Sign in to join <b>${esc(iv.teamName)}</b> as <b>${esc(iv.role)}</b>.</p>`+
+    gateForm([{label:"Email",name:"email",type:"email",required:true,value:email||"",autocomplete:"email"},
+             {label:"Password",name:"password",type:"password",required:true,autocomplete:"current-password"}],"Sign in & join",null));
+  bindGateForm(async d=>{
+    await API.post("/api/auth/login",d);
+    try{ await API.post("/api/teams/join",{code}); }
+    catch(e){ if(!/already/i.test(e.message||"")) throw e; }
     clearJoinHash(); await boot();
   });
 }
