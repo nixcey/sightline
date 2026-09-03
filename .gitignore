@@ -4,6 +4,8 @@ node_modules/
 .cf-token
 agent/config.json
 agent/state.json
+desktop/node_modules/
+desktop/dist/
 dist/
 *.log
 .DS_Store

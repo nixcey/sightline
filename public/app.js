@@ -792,11 +792,13 @@ async function importerDialog(){
   if(!canManage())return;
   const base=location.origin;
   const has=team().hasIngestKey;
+  const D=window.sightlineDesktop;
+  const winDesktop=!!(D && D.platform==="win32");
   const body=document.createElement("div");body.className="modal-b";
   const t=team();
   body.innerHTML=`
-    <p class="sub" style="margin:0">Auto-imports finished Valorant <b>custom games</b> into Sightline. Install the companion app on <b>one</b> machine (usually the IGL's) — it captures the whole scoreboard at match end and sends it here. Matches are de-duplicated by match ID, so nothing is imported twice.</p>
-    <div class="fld"><label>Sightline URL (for the app)</label>
+    <p class="sub" style="margin:0">Auto-imports finished Valorant <b>custom games</b>. Run the <b>agent</b> on one machine (usually the IGL's) — it reads Valorant's local API and sends the scoreboard here at match end. Matches are de-duplicated by match ID.</p>
+    <div class="fld"><label>Sightline URL (for the agent)</label>
       <div style="display:flex;gap:6px"><input readonly value="${esc(base)}" style="flex:1"><button class="btn ghost sm" id="cp_url">Copy</button></div></div>
     <div class="fld"><label>Ingest key</label>
       ${has
@@ -815,9 +817,22 @@ async function importerDialog(){
       <div class="fld"><label>Min players on a team</label><input id="imp_min" type="number" min="1" max="5" value="${t.importMin??3}"></div>
     </div>
     <button class="btn ghost sm" id="imp_save" style="align-self:flex-start">Save filter</button>
-    <div class="callout"><b>The app:</b> in the repo under <span class="mono">overwolf/</span> — load it as an unpacked Overwolf app, then paste the URL + key into its settings. See <span class="mono">overwolf/README.md</span>.</div>`;
+    ${winDesktop?`
+      <hr style="border:0;border-top:1px solid var(--border);margin:2px 0">
+      <div class="eyebrow">Run the agent on this PC</div>
+      <p class="sub" style="margin:0">You're in the Sightline desktop app. Paste the ingest key once, hit Start — the agent runs in the background while this app is open. No terminal, no Node install.</p>
+      <div class="fld"><label>Ingest key for the agent</label>
+        <div style="display:flex;gap:6px">
+          <input id="ag_key" placeholder="sk_…" style="flex:1" autocomplete="off">
+          <button class="btn" id="ag_toggle">Start</button>
+        </div>
+        <span class="hint" id="ag_state">checking…</span>
+      </div>
+      <pre class="agentlog" id="ag_log" hidden></pre>`:
+      `<div class="callout"><b>The agent</b> is in the repo under <span class="mono">agent/</span> (standalone, needs Node) — or use the <b>Sightline desktop app</b> (Windows/Linux) which runs it for you. See <span class="mono">agent/README.md</span> and <span class="mono">desktop/README.md</span>.</div>`}`;
   modalShell("Scrim importer",body,null,null,{noSave:true});
   body.querySelector("#cp_url").onclick=()=>copyText(base);
+  if(winDesktop) wireDesktopAgent(body);
   body.querySelector("#imp_save").onclick=async()=>{
     try{
       await API.put(`/api/teams/${TID()}`,{importPrefix:body.querySelector("#imp_prefix").value.trim(),importMin:+body.querySelector("#imp_min").value});
@@ -833,6 +848,35 @@ async function importerDialog(){
     try{ await API.del(`/api/teams/${TID()}/ingest-key`); await reload(); closeModal(); render(); toast("Ingest key revoked"); }catch(e){toast(e.message);}
   };
   const cp=body.querySelector("#ik_copy"); if(cp)cp.onclick=()=>copyText(body.querySelector("#ik_newval").value);
+}
+function wireDesktopAgent(body){
+  const D=window.sightlineDesktop;
+  const key=body.querySelector("#ag_key"), tog=body.querySelector("#ag_toggle");
+  const st=body.querySelector("#ag_state"), logEl=body.querySelector("#ag_log");
+  let running=false;
+  const paint=(s)=>{
+    running=!!s.running;
+    tog.textContent=running?"Stop":"Start";
+    tog.classList.toggle("ghost",running);
+    st.textContent=running
+      ? "running — keep this app open during scrims"
+      : (s.hasKey ? "stopped · key saved (paste a new one to replace it)" : "stopped — paste your ingest key and Start");
+    if(s.hasKey && !key.placeholder.includes("saved")) key.placeholder="sk_•••••••• (saved)";
+  };
+  D.agent.status().then(paint);
+  D.agent.onStatus(paint);
+  D.agent.onLog(({stream,line})=>{
+    logEl.hidden=false;
+    const cls=stream==="err"?"e":"";
+    logEl.textContent=(logEl.textContent+line+"\n").split("\n").slice(-250).join("\n");
+    logEl.scrollTop=logEl.scrollHeight;
+  });
+  tog.onclick=async()=>{
+    if(running){ await D.agent.stop(); return; }
+    const r=await D.agent.start({ ingestKey: key.value.trim() || undefined });
+    if(r&&r.error) toast(r.error);
+    else key.value="";
+  };
 }
 function editScrim(id){
   const ex=id?team().scrims.find(s=>s.id===id):null;

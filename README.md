@@ -132,6 +132,7 @@ src/valorant.js   HenrikDev rank lookup
 src/seed.js       sample-data generator for new teams
 migrations/       D1 schema
 agent/            scrim agent — reads Valorant's local client API, imports customs
+desktop/          Electron wrapper (Windows/Linux); runs the agent on Windows
 legacy/           v1 single-file app, and the shelved Overwolf importer
 ```
 
@@ -157,9 +158,17 @@ generate). See `agent/README.md`.
 The shelved Overwolf version is in `legacy/overwolf/` (Valorant apps need Riot
 approval to distribute — see its README).
 
+## Desktop app (`desktop/`)
+
+An Electron wrapper for **Windows and Linux** — the same web app in a native
+window, and on Windows a **Scrims → Scrim importer** panel that runs the agent
+for you (no terminal, no Node install — it uses Electron's bundled Node).
+Installers are built by CI on a `desktop-v*` tag and attached to a GitHub
+Release. `cd desktop && npm start` to run it against the live site. See
+`desktop/README.md`.
+
 ## Roadmap
 
 - Email delivery for invites and a password-reset flow.
 - Rate-limiting on auth + import endpoints.
-- Bundle the agent to a single `.exe` (Node SEA / Bun) so teammates don't need
-  Node installed.
+- Code-sign the desktop installers (Windows SmartScreen / Linux).

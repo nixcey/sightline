@@ -268,3 +268,8 @@ main{padding:24px;max-width:1200px;width:100%}
 .gatediv::before,.gatediv::after{content:"";flex:1;height:1px;background:var(--border)}
 #codeform{display:flex;flex-direction:column;gap:10px}
 .gatehint{font-size:11px;color:var(--ink-3);margin:12px 0 0;line-height:1.5;text-align:center}
+
+/* desktop-app agent runner (Scrim importer dialog) */
+.agentlog{margin:0;background:#0d0f12;border:1px solid var(--border);border-radius:3px;
+  padding:9px 11px;font-family:var(--mono);font-size:11px;line-height:1.5;color:#c9ccd1;
+  max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-word}

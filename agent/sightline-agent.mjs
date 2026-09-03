@@ -30,7 +30,9 @@ import { fileURLToPath } from "node:url";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const CFG_PATH = path.join(DIR, "config.json");
-const STATE_PATH = path.join(DIR, "state.json");
+// state.json lives next to the agent by default; the desktop wrapper points it
+// at a writable dir because a packaged app's resources are read-only.
+const STATE_PATH = process.env.SIGHTLINE_STATE || path.join(DIR, "state.json");
 
 // static, universally-used client-platform blob (decoded: PC / Windows / 10.0.19042 / Unknown)
 const CLIENT_PLATFORM =
@@ -44,21 +46,25 @@ const log = (...a) => console.log(`[${ts()}]`, ...a);
 const warn = (...a) => console.warn(`[${ts()}]`, ...a);
 
 /* ------------------------------------------------------------------ config + state */
+// Config comes from config.json next to the agent, OR from the environment
+// (SIGHTLINE_URL / SIGHTLINE_INGEST_KEY / SIGHTLINE_POLL_SECONDS) — the desktop
+// wrapper uses the env path so it doesn't need to write into the app bundle.
 function loadConfig() {
-  if (!fs.existsSync(CFG_PATH)) {
+  let c = {};
+  if (fs.existsSync(CFG_PATH)) {
+    try { c = JSON.parse(fs.readFileSync(CFG_PATH, "utf8")); }
+    catch { console.error(`config.json is not valid JSON (${CFG_PATH})`); process.exit(1); }
+  }
+  c.sightlineUrl = String(process.env.SIGHTLINE_URL || c.sightlineUrl || "").replace(/\/+$/, "");
+  c.ingestKey = String(process.env.SIGHTLINE_INGEST_KEY || c.ingestKey || "").trim();
+  c.pollSeconds = Math.max(10, Number(process.env.SIGHTLINE_POLL_SECONDS || c.pollSeconds) || 20);
+  if (!c.sightlineUrl || !c.ingestKey) {
     console.error(
-      `\nNo config.json next to the agent. Create ${CFG_PATH} :\n\n` +
+      `\nMissing config. Either create ${CFG_PATH} :\n\n` +
         `  {\n    "sightlineUrl": "https://sightline.nixcey.com",\n    "ingestKey": "sk_...",\n    "pollSeconds": 20\n  }\n\n` +
+        `or set SIGHTLINE_URL and SIGHTLINE_INGEST_KEY in the environment.\n` +
         `Get the ingest key from Sightline -> Scrims -> Scrim importer.\n`,
     );
-    process.exit(1);
-  }
-  const c = JSON.parse(fs.readFileSync(CFG_PATH, "utf8"));
-  c.sightlineUrl = String(c.sightlineUrl || "").replace(/\/+$/, "");
-  c.ingestKey = String(c.ingestKey || "").trim();
-  c.pollSeconds = Math.max(10, Number(c.pollSeconds) || 20);
-  if (!c.sightlineUrl || !c.ingestKey) {
-    console.error("config.json needs sightlineUrl and ingestKey");
     process.exit(1);
   }
   return c;

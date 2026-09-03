@@ -16,7 +16,14 @@ companion app.
   Worker build. `buildPayload()` + `resolvePlayerNames()` are the only spots that
   change if Riot's match-details / name-service shapes drift. Customs routinely
   omit `gameName`/`tagLine`, so names are resolved by puuid via
-  `PUT name-service/v2/players`.
+  `PUT name-service/v2/players`. Config from `config.json` or env
+  (`SIGHTLINE_URL` / `SIGHTLINE_INGEST_KEY` / `SIGHTLINE_STATE`).
+- `desktop/` — Electron wrapper (Win/Linux). Loads the live site; on Windows,
+  spawns `agent/sightline-agent.mjs` via Electron's bundled Node
+  (`ELECTRON_RUN_AS_NODE=1`). `preload.js` → `window.sightlineDesktop`; web app
+  shows the agent controls (`wireDesktopAgent`) only when that's present.
+  Own npm project; installers built by `.github/workflows/desktop.yml` on a
+  `desktop-v*` tag.
 - `legacy/` — v1 single-file localStorage app + the shelved Overwolf importer
   (Overwolf needs Riot approval to distribute Valorant apps)
 

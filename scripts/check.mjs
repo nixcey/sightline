@@ -20,7 +20,7 @@ const ok = (m) => console.log("  ✓ " + m);
 console.log("syntax");
 (function walk(dir) {
   for (const e of readdirSync(dir)) {
-    if (e === "node_modules" || e === ".git" || e === ".wrangler") continue;
+    if (["node_modules", ".git", ".wrangler", "dist"].includes(e)) continue;
     const p = join(dir, e);
     if (statSync(p).isDirectory()) walk(p);
     else if (e.endsWith(".js") || e.endsWith(".mjs")) {
