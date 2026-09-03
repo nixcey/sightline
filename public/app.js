@@ -1266,7 +1266,13 @@ function openForm({title,fields,del},onSubmit){
 }
 
 /* ============================================================ wire shell */
-$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b){state.view=b.dataset.v;render();}});
+const APP=$("#app");
+const closeNav=()=>APP.classList.remove("nav-open");
+$("#drawerBtn").onclick=()=>APP.classList.toggle("nav-open");
+$("#railScrim").onclick=closeNav;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeNav();});
+window.addEventListener("resize",()=>{if(window.innerWidth>860)closeNav();});
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b){state.view=b.dataset.v;render();closeNav();}});
 $("#wkPrev").onclick=()=>{state.week=addDays(state.week,-7);render();};
 $("#wkNext").onclick=()=>{state.week=addDays(state.week,7);render();};
 $("#tourPill").onclick=()=>{
@@ -1277,6 +1283,7 @@ $("#tourPill").onclick=()=>{
       i<0?"Marked tournament week":"Unmarked");
 };
 $("#teamSelect").onchange=async e=>{
+  closeNav();
   if(e.target.value==="__new"){ e.target.value=TID(); return newTeamDialog(); }
   try{ await loadTeam(e.target.value); state.view="overview"; render(); }
   catch(err){ toast(err.message); }
@@ -1288,6 +1295,7 @@ $("#btnTheme").onclick=()=>{
   try{localStorage.setItem("sightline.theme",next||"");}catch(e){}
 };
 $("#btnExport").onclick=async()=>{
+  closeNav();
   try{
     const data=await API.get(`/api/teams/${TID()}`);
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -1298,7 +1306,7 @@ $("#btnExport").onclick=async()=>{
     toast("Exported team backup");
   }catch(e){toast(e.message);}
 };
-$("#btnAccount").onclick=accountDialog;
+$("#btnAccount").onclick=()=>{closeNav();accountDialog();};
 try{const th=localStorage.getItem("sightline.theme");if(th)document.documentElement.setAttribute("data-theme",th);}catch(e){}
 
 /* ============================================================ auth gate */
