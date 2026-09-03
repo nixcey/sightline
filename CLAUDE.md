@@ -52,7 +52,10 @@ companion app.
 - **Discord:** `notifyTeam(c, teamRowOrId, payload)` POSTs an embed to
   `teams.discord_webhook` via `c.executionCtx.waitUntil` (fire-and-forget). Fires
   on scrim/official logged or imported, activity added, tournament week set.
-  `DISCORD_RE` validates the URL on save.
+  `DISCORD_RE` validates the URL on save. `teams.discord_role_id` (optional,
+  digits only) is prepended as `<@&id>` in `content` by `withRolePing()` with
+  `allowed_mentions.roles` so the webhook can ping a non-mentionable role.
+  `PUT /api/teams/:id/discord` patches `webhook` and/or `roleId` field-wise.
 
 ## Local dev / deploy
 ```

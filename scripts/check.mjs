@@ -149,7 +149,7 @@ function teamFixture() {
     { id: "p2", handle: "Sable", name: "L", role: "Duelist", status: "Starter", icon: "🗡️", joined: "2025-11-02", agents: ["Jett"], rank: rk("Immortal", 2, 25), riotId: { name: "XPE Sable", tag: "EUW", region: "" }, rankSyncedAt: null, note: "", perfNotes: [] },
   ];
   return {
-    team: { id: "t1", name: "XPE", tag: "XPE", server: "EU", scrimGoal: { base: 1, tournament: 3 }, tournamentWeeks: ["2026-08-31"], hasRankApiKey: true, hasIngestKey: true, hasDiscord: true, importPrefix: "XPE", importMin: 3 },
+    team: { id: "t1", name: "XPE", tag: "XPE", server: "EU", scrimGoal: { base: 1, tournament: 3 }, tournamentWeeks: ["2026-08-31"], hasRankApiKey: true, hasIngestKey: true, hasDiscord: true, discordRoleId: "1234567890", importPrefix: "XPE", importMin: 3 },
     myRole: "manager", myPlayerId: null,
     schedule: { winStart: "11:00", winEnd: "24:00", includeSubs: false, blocks: [{ id: "b1", pid: "p1", day: 0, start: "13:00", end: "15:00", label: "Class" }] },
     roster: players,

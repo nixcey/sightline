@@ -128,6 +128,11 @@ new activity added to the week, and a week marked as a tournament week. Webhook
 delivery is fire-and-forget (`c.executionCtx.waitUntil`); the URL lives in the
 `teams` row and is never sent to the browser (`hasDiscord` boolean only).
 
+Optionally set a **role ID** to `@mention` on every notification
+(`teams.discord_role_id`). The mention goes in the message `content` (embeds
+never ping) with `allowed_mentions.roles`, so a webhook can ping the role even
+when it isn't set "mentionable" in Discord.
+
 ## Data model
 
 `teams` → each has `players`, `scrims`, `rank_snapshots`, `tryouts`,

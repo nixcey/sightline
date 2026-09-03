@@ -27,6 +27,16 @@ const bad = (c, msg, code = 400) => c.json({ error: msg }, code);
 // ---------------------------------------------------------------- Discord notifications
 const DISCORD_RE = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+/;
 const COLOR = { good: 0x3ad1bf, bad: 0xf0656e, gold: 0xe7a343, accent: 0xff4655, grey: 0x767c86 };
+// role mention has to sit in `content` (embeds never ping); allowed_mentions lets a
+// webhook ping a role even when it isn't set "mentionable" in Discord.
+function withRolePing(payload, roleId) {
+  if (!roleId) return payload;
+  return {
+    ...payload,
+    content: `<@&${roleId}>${payload.content ? " " + payload.content : ""}`,
+    allowed_mentions: { parse: [], roles: [roleId] },
+  };
+}
 async function discordSend(webhook, payload) {
   if (!webhook || !DISCORD_RE.test(webhook)) return false;
   try {
@@ -35,13 +45,18 @@ async function discordSend(webhook, payload) {
   } catch { return false; }
 }
 async function notifyTeam(c, teamRowOrId, payload) {
-  let webhook = teamRowOrId && typeof teamRowOrId === "object" ? teamRowOrId.discord_webhook : null;
+  let webhook, roleId;
+  if (teamRowOrId && typeof teamRowOrId === "object") {
+    webhook = teamRowOrId.discord_webhook;
+    roleId = teamRowOrId.discord_role_id;
+  }
   if (webhook == null) {
-    const t = await c.env.DB.prepare("SELECT discord_webhook FROM teams WHERE id = ?").bind(teamRowOrId).first();
+    const t = await c.env.DB.prepare("SELECT discord_webhook, discord_role_id FROM teams WHERE id = ?").bind(teamRowOrId).first();
     webhook = t && t.discord_webhook;
+    roleId = t && t.discord_role_id;
   }
   if (!webhook) return;
-  const p = discordSend(webhook, payload);
+  const p = discordSend(webhook, withRolePing(payload, roleId));
   if (c.executionCtx && c.executionCtx.waitUntil) c.executionCtx.waitUntil(p);
   else await p;
 }
@@ -318,6 +333,7 @@ app.get("/api/teams/:id", team("player"), async (c) => {
       hasRankApiKey: !!t.rank_api_key,
       hasIngestKey: !!t.ingest_key,
       hasDiscord: !!t.discord_webhook,
+      discordRoleId: t.discord_role_id || "",
       importPrefix: t.import_prefix || t.tag,
       importMin: t.import_min ?? 3,
     },
@@ -413,17 +429,29 @@ app.delete("/api/teams/:id/ingest-key", team("igl"), async (c) => {
 // ---- Discord webhook for team notifications ----
 app.put("/api/teams/:id/discord", team("igl"), async (c) => {
   const b = await readJson(c);
-  const webhook = String(b.webhook || "").trim();
-  if (webhook && !DISCORD_RE.test(webhook)) return bad(c, "that isn't a Discord webhook URL");
-  await c.env.DB.prepare("UPDATE teams SET discord_webhook = ? WHERE id = ?").bind(webhook, c.req.param("id")).run();
-  return c.json({ ok: true, connected: !!webhook });
+  const sets = [], vals = [];
+  if ("webhook" in b) {
+    const webhook = String(b.webhook || "").trim();
+    if (webhook && !DISCORD_RE.test(webhook)) return bad(c, "that isn't a Discord webhook URL");
+    sets.push("discord_webhook = ?"); vals.push(webhook);
+  }
+  if ("roleId" in b) {
+    sets.push("discord_role_id = ?");
+    vals.push(String(b.roleId || "").replace(/\D/g, "").slice(0, 24));
+  }
+  if (sets.length) {
+    vals.push(c.req.param("id"));
+    await c.env.DB.prepare(`UPDATE teams SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+  }
+  const t = await c.env.DB.prepare("SELECT discord_webhook FROM teams WHERE id = ?").bind(c.req.param("id")).first();
+  return c.json({ ok: true, connected: !!t.discord_webhook });
 });
 app.post("/api/teams/:id/discord/test", team("igl"), async (c) => {
-  const t = await c.env.DB.prepare("SELECT discord_webhook, name FROM teams WHERE id = ?").bind(c.req.param("id")).first();
+  const t = await c.env.DB.prepare("SELECT discord_webhook, discord_role_id, name FROM teams WHERE id = ?").bind(c.req.param("id")).first();
   if (!t.discord_webhook) return bad(c, "no webhook set — save one first");
-  const ok = await discordSend(t.discord_webhook, {
-    embeds: [{ title: "✅ Sightline connected", description: `Notifications for **${t.name}** will post here.`, color: COLOR.good }],
-  });
+  const ok = await discordSend(t.discord_webhook, withRolePing({
+    embeds: [{ title: "✅ Sightline connected", description: `Notifications for **${t.name}** will post here${t.discord_role_id ? ", pinging this role" : ""}.`, color: COLOR.good }],
+  }, t.discord_role_id));
   return ok ? c.json({ ok: true }) : bad(c, "Discord rejected the webhook (deleted or wrong URL?)");
 });
 

@@ -1572,23 +1572,29 @@ function accountDialog(){
 function discordDialog(){
   if(!canManage())return;
   const connected=team().hasDiscord;
+  const roleId=team().discordRoleId||"";
   const body=document.createElement("div");body.className="modal-b";
   body.innerHTML=`
     <p class="sub" style="margin:0">Post team activity to a Discord channel — scrims &amp; officials logged or imported, new schedule activities, tournament weeks. Uses an <b>incoming webhook</b>: in Discord open <b>Channel → Edit → Integrations → Webhooks → New Webhook</b>, then <b>Copy Webhook URL</b>.</p>
     <div class="fld"><label>Webhook URL</label>
-      <input id="dc_url" type="url" autocomplete="off" placeholder="https://discord.com/api/webhooks/…"
-        value="${connected?'':''}">
-      ${connected?'<span class="hint">A webhook is saved (hidden). Paste a new URL to replace it, or disconnect below.</span>':''}</div>
+      <input id="dc_url" type="url" autocomplete="off" placeholder="${connected?'•••••••• saved — paste a new URL to replace':'https://discord.com/api/webhooks/…'}">
+    </div>
+    <div class="fld"><label>Ping this role (optional)</label>
+      <input id="dc_role" inputmode="numeric" autocomplete="off" placeholder="role ID, e.g. 1234567890" value="${esc(roleId)}">
+      <span class="hint">Enable <b>Settings → Advanced → Developer Mode</b> in Discord, then right-click the role (Server Settings → Roles) → <b>Copy Role ID</b>. Or type <span class="mono">\\@RoleName</span> in any channel and copy the digits. Leave blank for no ping.</span></div>
     <div class="btn-row">
-      <button class="btn" id="dc_save">${connected?'Replace':'Connect'}</button>
+      <button class="btn" id="dc_save">${connected?'Save':'Connect'}</button>
       ${connected?`<button class="btn ghost" id="dc_test">Send test message</button>`:''}
       ${connected?`<button class="btn ghost" id="dc_off" style="color:var(--crit);border-color:var(--crit)">Disconnect</button>`:''}
     </div>`;
   modalShell("Discord notifications",body,null,null,{noSave:true});
-  const val=()=>body.querySelector("#dc_url").value.trim();
+  const url=()=>body.querySelector("#dc_url").value.trim();
+  const rid=()=>body.querySelector("#dc_role").value.replace(/\D/g,"");
   body.querySelector("#dc_save").onclick=async()=>{
-    if(!val())return toast("Paste a webhook URL");
-    try{ await API.put(`/api/teams/${TID()}/discord`,{webhook:val()}); await reload(); toast("Discord connected"); closeModal(); discordDialog(); }
+    const payload={roleId:rid()};
+    if(url()) payload.webhook=url();
+    else if(!connected) return toast("Paste a webhook URL");
+    try{ await API.put(`/api/teams/${TID()}/discord`,payload); await reload(); toast("Saved"); closeModal(); discordDialog(); }
     catch(e){ toast(e.message); }
   };
   const tb=body.querySelector("#dc_test"); if(tb)tb.onclick=async()=>{
