@@ -1,5 +1,9 @@
 # Testing the Overwolf app on Windows
 
+> **Superseded.** The Overwolf route is shelved (Valorant apps need Riot approval
+> to distribute). Use `agent/` — see `agent/README.md`. Kept for reference only.
+
+
 Everything you need to test `overwolf/` against the live Sightline
 (`https://sightline.nixcey.com`), offline from any chat.
 

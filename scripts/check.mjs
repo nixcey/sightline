@@ -39,38 +39,39 @@ try {
   fail("render harness: " + (e.stack || e.message));
 }
 
-/* ---------- 3. overwolf parser ---------- */
-console.log("overwolf");
+/* ---------- 3. scrim agent — match-details parsing ---------- */
+console.log("agent");
 try {
-  const { buildPayload } = require("../overwolf/valorant.js");
-  const R = (n, t, ch, tm) => JSON.stringify({ name: n, tagline: t, character: ch, teammate: tm });
-  const scrim = {
-    me: { name: "XPE nix" },
-    match_info: {
-      pseudo_match_id: "S1", map: "Ascent", custom_game: true, score: { won: 13, lost: 9 },
-      roster_0: R("XPE nix", "EUW", "Cypher", true), roster_1: R("XPE Sable", "EUW", "Raze", true),
-      roster_2: R("XPE Koda", "EU1", "Omen", true), roster_3: R("XPE Riven", "EUW", "Fade", true),
-      roster_4: R("XPE Tython", "EU2", "KAYO", true), roster_5: R("Enemy1", "EU", "Jett", false),
-    },
+  const m = await import("../agent/sightline-agent.mjs");
+  m.META.agents["1e58de9c-4950-5125-93e9-a0aee9f98746"] = "Killjoy";
+  m.META.maps["/Game/Maps/Ascent/Ascent"] = "Ascent";
+  const P = (subj, name, tag, team, k, d, a) => ({
+    subject: subj, gameName: name, tagLine: tag, teamId: team,
+    characterId: "1e58de9c-4950-5125-93e9-a0aee9f98746",
+    stats: { kills: k, deaths: d, assists: a, roundsPlayed: 22 },
+  });
+  const md = {
+    matchInfo: { matchId: "abc", mapId: "/Game/Maps/Ascent/Ascent", provisioningFlowID: "CustomGame", queueID: "", gameStartMillis: 1788000000000, isCompleted: true },
+    players: [
+      P("me", "XPE nix", "EUW", "Blue", 16, 12, 9), P("p2", "XPE b", "EU", "Blue", 21, 13, 5),
+      P("p3", "XPE c", "EU", "Blue", 10, 15, 9), P("p4", "XPE d", "EU", "Blue", 17, 11, 11),
+      P("p5", "XPE e", "EU", "Blue", 16, 12, 8), P("e1", "Foe", "EU", "Red", 20, 16, 3),
+    ],
+    teams: [{ teamId: "Blue", roundsWon: 13 }, { teamId: "Red", roundsWon: 9 }],
+    roundResults: [{ playerStats: [{ subject: "me", damage: [{ damage: 150 }] }] }],
   };
-  const a = buildPayload(scrim, { modes: ["custom"], prefix: "XPE", min: 3 });
-  if (!a.payload || a.payload.us.length !== 5) throw new Error("scrim should be accepted with 5 on our side");
-  if (a.payload.us[4].agent !== "KAY/O") throw new Error("agent alias KAYO -> KAY/O failed");
-
-  const pug = {
-    me: { name: "XPE nix" },
-    match_info: {
-      pseudo_match_id: "P1", map: "Bind", custom_game: true,
-      roster_0: R("XPE nix", "EUW", "Cypher", true), roster_1: R("rando", "EU", "Raze", true),
-      roster_5: R("r2", "EU", "Jett", false),
-    },
-  };
-  if (!buildPayload(pug, { modes: ["custom"], prefix: "XPE", min: 3 }).skip) {
-    throw new Error("1-XPE pug should be rejected");
-  }
-  ok("parser accepts scrims, rejects non-scrims");
+  const pl = m.buildPayload(md, "me");
+  if (pl.map !== "Ascent" || pl.mode !== "custom") throw new Error("bad matchInfo parse");
+  if (pl.us.length !== 5 || pl.them.length !== 1) throw new Error("bad team split");
+  if (pl.rounds.won !== 13 || pl.rounds.lost !== 9) throw new Error("bad score");
+  if (pl.us[0].riotId !== "XPE nix#EUW" || pl.us[0].agent !== "Killjoy") throw new Error("bad player entry");
+  if (!m.looksLikeScrim(pl, { prefix: "XPE", min: 3, modes: ["custom"] })) throw new Error("5-XPE custom should pass the filter");
+  const rs = m.regionShardFromLog("x https://glz-eu-1.eu.a.pvp.net/y");
+  if (!rs || rs.region !== "eu") throw new Error("region parse");
+  if (m.versionFromLog("CI server version: release-13.05-shipping-11-5350494\n") !== "release-13.05-shipping-11-5350494") throw new Error("version parse");
+  ok("match-details parses; scrim filter + log parsers work");
 } catch (e) {
-  fail("parser: " + e.message);
+  fail("agent: " + (e.stack || e.message));
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nall checks passed");

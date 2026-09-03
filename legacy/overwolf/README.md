@@ -1,4 +1,11 @@
-# Sightline Scrim Importer (Overwolf)
+# Sightline Scrim Importer (Overwolf) — SHELVED
+
+> **Not the recommended path.** Overwolf apps that target Valorant require Riot
+> Games approval to distribute, and dev-loading an unpacked app isn't a real
+> distribution route. Use **`agent/`** instead — a standalone Node script that
+> reads Valorant's local client API, no Overwolf and no Riot review. This folder
+> is kept only as a reference for the GEP scoreboard-parsing logic
+> (`valorant.js`) in case Overwolf approval ever happens.
 
 Desktop companion that watches Valorant and, when a **custom game** finishes,
 sends the full scoreboard to Sightline as a scrim — no manual entry.

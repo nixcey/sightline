@@ -1,0 +1,12 @@
+{
+  "name": "sightline-scrim-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads Valorant's local client API and imports finished custom games into Sightline. Zero dependencies.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node sightline-agent.mjs",
+    "test": "node sightline-agent.mjs --test"
+  }
+}

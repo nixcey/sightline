@@ -11,8 +11,12 @@ companion app.
 - `src/seed.js` — sample data for new teams
 - `public/` — frontend: `index.html`, `app.js` (all views), `app.css`, `api.js`
 - `migrations/` — D1 schema, applied in order
-- `overwolf/` — Overwolf app; **not** part of the Worker build, loaded by Overwolf
-- `legacy/` — the original single-file localStorage version
+- `agent/` — scrim agent: zero-dep Node script, reads Valorant's local client
+  API and POSTs finished customs to `/api/import/match`. **Not** part of the
+  Worker build. `buildPayload()` is the only thing that changes if Riot's
+  match-details shape drifts.
+- `legacy/` — v1 single-file localStorage app + the shelved Overwolf importer
+  (Overwolf needs Riot approval to distribute Valorant apps)
 
 ## Conventions
 - **Roles:** `manager` and `igl` are both full admins (`canEdit()` / `canManage()`

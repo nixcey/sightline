@@ -131,31 +131,35 @@ src/auth.js       password hashing, sessions, cookies
 src/valorant.js   HenrikDev rank lookup
 src/seed.js       sample-data generator for new teams
 migrations/       D1 schema
-overwolf/         Overwolf companion app — auto-imports Valorant custom games
-legacy/           the original single-file localStorage version (v1)
+agent/            scrim agent — reads Valorant's local client API, imports customs
+legacy/           v1 single-file app, and the shelved Overwolf importer
 ```
 
-## Scrim import (Overwolf)
+## Scrim import (`agent/`)
 
-The IGL runs the `overwolf/` companion app. When a Valorant **custom game** ends
-it sends the whole scoreboard to `POST /api/import/match`, authenticated by a
-per-team **ingest key** (Scrims → Scrim importer → generate).
+The IGL runs `agent/sightline-agent.mjs` — a zero-dependency Node script that
+reads Valorant's **local client API** (`127.0.0.1` lockfile → entitlement token →
+`core-game` / `match-details`). No Riot password, no Overwolf, no Riot developer
+approval. When a custom game ends it `POST`s the scoreboard to
+`/api/import/match` with a per-team **ingest key** (Scrims → Scrim importer →
+generate). See `agent/README.md`.
 
 - **Not every custom is a scrim.** A game is only imported when at least
   `import_min` (default 3) players whose in-game name starts with the team's
-  `import_prefix` (default = tag, e.g. `XPE`) are on one team. If that team is the
-  one Overwolf labelled as the enemy, sides and score are swapped.
-- Players are matched to the roster by **Riot ID** — set each roster player's
-  Riot ID to their *full* in-game name including the prefix (`XPE nix#EUW`).
-  Unmatched players import as "unlinked" rows you attach later.
-- The match's `pseudo_match_id` is stored, so the same match is **never imported
-  twice** — a repeat returns `{imported:false, reason:"already imported"}`.
+  `import_prefix` (default = tag, e.g. `XPE`) are on one team. If Overwolf/Riot
+  labelled the wrong team as "us", the server swaps sides and flips the score.
+- Players link to the roster by **Riot ID** — set each roster player's Riot ID to
+  their full in-game name including the prefix (`XPE nix` / `EUW`). Unmatched
+  players import as "unlinked" rows you attach later.
+- The Riot match id is stored, so the same match is **never imported twice** — a
+  repeat returns `{imported:false, reason:"already imported"}`.
 
-See `overwolf/README.md`.
+The shelved Overwolf version is in `legacy/overwolf/` (Valorant apps need Riot
+approval to distribute — see its README).
 
 ## Roadmap
 
-- Manual "import by match ID" for scrims that *are* in match history (HenrikDev
-  by-ID endpoint) — complements the Overwolf path for non-hidden games.
 - Email delivery for invites and a password-reset flow.
 - Rate-limiting on auth + import endpoints.
+- Bundle the agent to a single `.exe` (Node SEA / Bun) so teammates don't need
+  Node installed.
