@@ -13,9 +13,15 @@ Grab an installer from the repo's **Releases** page (built by CI on every
 - **Linux** — `Sightline-x.y.z.AppImage` (or the `.deb`)
 
 Sign in as usual. On Windows, **Scrims → Scrim importer** now has a *"Run the
-agent on this PC"* section: paste your ingest key once, hit **Start**, leave the
-window open while you scrim. The agent's log shows inline; the key is saved to
-the OS user-data folder (not the app bundle).
+agent on this PC"* section:
+
+- paste your ingest key once (saved to the OS user-data folder, not the bundle)
+- **Start / Stop** toggle — the agent is **off** until you start it
+- optional *"Start automatically when this app opens"*
+- a live **log** that survives closing/reopening the dialog (Clear to wipe it)
+
+Leave the window open while you scrim. More than one teammate can run it — the
+server de-dupes on match id, so nothing imports twice.
 
 Linux users just get the web app in a window — Valorant doesn't run on Linux, so
 there's nothing for the agent to read.

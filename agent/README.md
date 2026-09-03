@@ -1,9 +1,16 @@
 # Sightline scrim agent
 
 Reads Valorant's **local client API** and imports finished **custom games** into
-Sightline. One person runs it (the IGL) — the local API exposes the full match, so
-one instance captures everyone. No Overwolf, no Riot developer approval, no npm
-dependencies.
+Sightline. One instance is enough — the local API exposes the whole match, so
+whoever runs it captures every player. **Several teammates can run it at once**
+too: Sightline de-dupes on the match id, so concurrent imports of the same game
+collapse to one scrim (the extras get `{imported:false, reason:"already
+imported"}`). No Overwolf, no Riot developer approval, no npm dependencies.
+
+Two ways to run it:
+- **Standalone** — this folder + `config.json`, `node sightline-agent.mjs`.
+- **Sightline desktop app** (`../desktop/`) — Windows only; a Start/Stop toggle
+  and live log inside the app, no Node install. See `../desktop/README.md`.
 
 ## What it does
 

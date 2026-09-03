@@ -828,7 +828,12 @@ async function importerDialog(){
         </div>
         <span class="hint" id="ag_state">checking…</span>
       </div>
-      <pre class="agentlog" id="ag_log" hidden></pre>`:
+      <label style="display:flex;gap:7px;align-items:center;font-size:12px;color:var(--ink-2);cursor:pointer"><input type="checkbox" id="ag_auto" style="width:auto"> Start the agent automatically when this app opens</label>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="eyebrow" style="margin:0">Agent log</span>
+        <button class="btn ghost sm" id="ag_logclear">Clear</button>
+      </div>
+      <pre class="agentlog" id="ag_log"></pre>`:
       `<div class="callout"><b>The agent</b> is in the repo under <span class="mono">agent/</span> (standalone, needs Node) — or use the <b>Sightline desktop app</b> (Windows/Linux) which runs it for you. See <span class="mono">agent/README.md</span> and <span class="mono">desktop/README.md</span>.</div>`}`;
   modalShell("Scrim importer",body,null,null,{noSave:true});
   body.querySelector("#cp_url").onclick=()=>copyText(base);
@@ -849,34 +854,40 @@ async function importerDialog(){
   };
   const cp=body.querySelector("#ik_copy"); if(cp)cp.onclick=()=>copyText(body.querySelector("#ik_newval").value);
 }
+let _agentCleanup=[];
 function wireDesktopAgent(body){
+  _agentCleanup.forEach(fn=>{try{fn();}catch(e){}}); _agentCleanup=[];
   const D=window.sightlineDesktop;
   const key=body.querySelector("#ag_key"), tog=body.querySelector("#ag_toggle");
   const st=body.querySelector("#ag_state"), logEl=body.querySelector("#ag_log");
+  const auto=body.querySelector("#ag_auto");
   let running=false;
   const paint=(s)=>{
     running=!!s.running;
     tog.textContent=running?"Stop":"Start";
     tog.classList.toggle("ghost",running);
+    auto.checked=!!s.autostart;
     st.textContent=running
       ? "running — keep this app open during scrims"
       : (s.hasKey ? "stopped · key saved (paste a new one to replace it)" : "stopped — paste your ingest key and Start");
     if(s.hasKey && !key.placeholder.includes("saved")) key.placeholder="sk_•••••••• (saved)";
   };
-  D.agent.status().then(paint);
-  D.agent.onStatus(paint);
-  D.agent.onLog(({stream,line})=>{
-    logEl.hidden=false;
-    const cls=stream==="err"?"e":"";
-    logEl.textContent=(logEl.textContent+line+"\n").split("\n").slice(-250).join("\n");
+  const append=({stream,line})=>{
+    logEl.textContent=(logEl.textContent+line+"\n").split("\n").slice(-300).join("\n");
     logEl.scrollTop=logEl.scrollHeight;
-  });
+  };
+  D.agent.status().then(paint);
+  D.agent.logHistory().then(h=>{ logEl.textContent=""; h.forEach(append); });
+  _agentCleanup.push(D.agent.onStatus(paint));
+  _agentCleanup.push(D.agent.onLog(append));
   tog.onclick=async()=>{
     if(running){ await D.agent.stop(); return; }
     const r=await D.agent.start({ ingestKey: key.value.trim() || undefined });
     if(r&&r.error) toast(r.error);
     else key.value="";
   };
+  auto.onchange=()=>D.agent.setAutostart(auto.checked).then(paint);
+  body.querySelector("#ag_logclear").onclick=()=>{ logEl.textContent=""; };
 }
 function editScrim(id){
   const ex=id?team().scrims.find(s=>s.id===id):null;

@@ -833,11 +833,21 @@ app.post("/api/import/match", async (c) => {
   const opp = (b.opponentName || "").toString().trim() || "Imported scrim";
   const sid = nid(8);
 
-  await c.env.DB.prepare(
-    "INSERT INTO scrims (id,team_id,date,opp,map,rw,rl,lineup,enemy,match_id,source,imported_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-  )
-    .bind(sid, t.id, date, opp, String(b.map), rw, rl, JSON.stringify(lineup), JSON.stringify(enemy), matchId, "overwolf", now(), now())
-    .run();
+  try {
+    await c.env.DB.prepare(
+      "INSERT INTO scrims (id,team_id,date,opp,map,rw,rl,lineup,enemy,match_id,source,imported_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    )
+      .bind(sid, t.id, date, opp, String(b.map), rw, rl, JSON.stringify(lineup), JSON.stringify(enemy), matchId, "overwolf", now(), now())
+      .run();
+  } catch (e) {
+    // several teammates run the agent -> concurrent imports of the same match id.
+    // the unique index (team_id, match_id) rejects the loser; treat it as a no-op.
+    if (/UNIQUE|constraint/i.test(String(e && e.message))) {
+      const existing = await c.env.DB.prepare("SELECT id FROM scrims WHERE team_id = ? AND match_id = ?").bind(t.id, matchId).first();
+      return c.json({ imported: false, reason: "already imported", scrimId: existing ? existing.id : null });
+    }
+    throw e;
+  }
 
   return c.json({ imported: true, scrimId: sid, matched: lineup.length - unmatched.length, unmatched, swapped });
 });
