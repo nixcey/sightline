@@ -15,8 +15,10 @@ dependencies.
    valorant-api.com, which also supplies map/agent names — so a game patch
    doesn't need a code change here).
 4. Polls `core-game/v1/players/<puuid>` for the live match id. When the match
-   ends it fetches `match-details/v1/matches/<id>`, normalises it, and
-   `POST`s to `<sightlineUrl>/api/import/match` with your ingest key.
+   ends it fetches `match-details/v1/matches/<id>`. Custom games often come back
+   with blank `gameName`/`tagLine`, so it resolves any missing names by puuid via
+   `PUT name-service/v2/players`, normalises, and `POST`s to
+   `<sightlineUrl>/api/import/match` with your ingest key.
 
 Sightline de-dupes on the match id (a match can't import twice) and only keeps
 customs with `N`+ prefix-tagged players on one team — set both on the website

@@ -1,7 +1,7 @@
 # Working on Sightline
 
 Valorant esports team ops tracker. **Cloudflare Worker + D1 + Hono**, vanilla-JS
-frontend. See `README.md` for the full picture and `overwolf/README.md` for the
+frontend. See `README.md` for the full picture and `agent/README.md` for the
 companion app.
 
 ## Layout
@@ -13,8 +13,10 @@ companion app.
 - `migrations/` — D1 schema, applied in order
 - `agent/` — scrim agent: zero-dep Node script, reads Valorant's local client
   API and POSTs finished customs to `/api/import/match`. **Not** part of the
-  Worker build. `buildPayload()` is the only thing that changes if Riot's
-  match-details shape drifts.
+  Worker build. `buildPayload()` + `resolvePlayerNames()` are the only spots that
+  change if Riot's match-details / name-service shapes drift. Customs routinely
+  omit `gameName`/`tagLine`, so names are resolved by puuid via
+  `PUT name-service/v2/players`.
 - `legacy/` — v1 single-file localStorage app + the shelved Overwolf importer
   (Overwolf needs Riot approval to distribute Valorant apps)
 

@@ -14,7 +14,9 @@
  *   3. region/shard + client version from ShooterGame.log (fallback: valorant-api.com)
  *   4. poll  glz .../core-game/v1/players/<puuid>  for the live match id
  *   5. when the match ends, GET  pd .../match-details/v1/matches/<id>
- *   6. normalise -> POST <sightline>/api/import/match   (Bearer <ingest key>)
+ *   6. match-details often omits gameName/tagLine on customs, so resolve any
+ *        missing names by puuid via  PUT pd .../name-service/v2/players
+ *   7. normalise -> POST <sightline>/api/import/match   (Bearer <ingest key>)
  *
  * These endpoints are unofficial but stable and read-only. Map/agent names and the
  * client version are pulled live from valorant-api.com so a game patch doesn't
@@ -188,9 +190,31 @@ async function matchDetails(auth, matchId) {
   if (!r.ok) throw new Error(`match-details HTTP ${r.status}`);
   return r.json();
 }
+// match-details frequently returns empty gameName/tagLine for custom games;
+// this resolves current names for any puuid. Body is a JSON array of puuids.
+async function resolvePlayerNames(auth, puuids) {
+  const ids = [...new Set((puuids || []).filter(Boolean))];
+  if (!ids.length) return {};
+  try {
+    const r = await fetch(`https://pd.${auth.shard}.a.pvp.net/name-service/v2/players`, {
+      method: "PUT",
+      headers: { ...pvpHeaders(auth), "content-type": "application/json" },
+      body: JSON.stringify(ids),
+    });
+    if (!r.ok) { warn(`name-service HTTP ${r.status}`); return {}; }
+    const map = {};
+    for (const p of (await r.json()) || []) {
+      if (p.Subject && p.GameName) map[p.Subject] = `${p.GameName}#${p.TagLine}`;
+    }
+    return map;
+  } catch (e) {
+    warn("name-service unreachable: " + e.message);
+    return {};
+  }
+}
 
 /* ------------------------------------------------------------------ normalise -> Sightline payload */
-function buildPayload(md, myPuuid) {
+function buildPayload(md, myPuuid, nameMap = {}) {
   const mi = md.matchInfo || {};
   const players = md.players || [];
   const me = players.find((p) => p.subject === myPuuid);
@@ -212,8 +236,9 @@ function buildPayload(md, myPuuid) {
   }
   const entry = (p) => {
     const rounds = p.stats?.roundsPlayed || totalRounds || 1;
+    const direct = p.gameName && p.tagLine ? `${p.gameName}#${p.tagLine}` : "";
     return {
-      riotId: `${p.gameName}#${p.tagLine}`,
+      riotId: direct || nameMap[p.subject] || "",
       agent: agentName(p.characterId),
       k: p.stats?.kills || 0,
       d: p.stats?.deaths || 0,
@@ -254,14 +279,16 @@ async function slImport(cfg, payload) {
   return d;
 }
 
-/* client-side pre-filter mirroring the server: only bother with games that look like scrims */
+/* client-side pre-filter mirroring the server: only bother with games that look like scrims.
+   The server re-checks with the roster and is authoritative — this just cuts noise. */
 function looksLikeScrim(payload, filter) {
-  if (payload.mode !== "custom" && !(filter.modes || ["custom"]).includes(payload.mode)) return false;
-  const prefix = filter.prefix || "";
+  const modes = (filter?.modes?.length ? filter.modes : ["custom"]).map((m) => String(m).toLowerCase());
+  if (!modes.includes(String(payload.mode || "").toLowerCase())) return false;
+  const prefix = filter?.prefix || "";
   if (!prefix) return true;
   const re = new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s._-]?", "i");
   const nameOf = (rid) => String(rid || "").split("#")[0].trim();
-  const min = filter.min || 3;
+  const min = filter?.min ?? 3;
   const us = payload.us.filter((p) => re.test(nameOf(p.riotId))).length;
   const them = payload.them.filter((p) => re.test(nameOf(p.riotId))).length;
   return us >= min || them >= min;
@@ -291,8 +318,11 @@ async function processMatch(cfg, auth, matchId, filter) {
     return;
   }
 
-  const payload = buildPayload(md, auth.puuid);
+  const nameMap = await resolvePlayerNames(auth, (md.players || []).map((p) => p.subject));
+  const payload = buildPayload(md, auth.puuid, nameMap);
   if (!payload.us.length) { warn(`could not place you on a team in ${matchId}, skipping`); return; }
+  const missing = [...payload.us, ...payload.them].filter((p) => !p.riotId).length;
+  if (missing) warn(`${missing} player name(s) could not be resolved — they'll import as unlinked`);
 
   if (!looksLikeScrim(payload, filter)) {
     log(`skip ${payload.map} — not a scrim (< ${filter.min} "${filter.prefix}" on a team)`);

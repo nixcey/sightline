@@ -66,6 +66,13 @@ try {
   if (pl.rounds.won !== 13 || pl.rounds.lost !== 9) throw new Error("bad score");
   if (pl.us[0].riotId !== "XPE nix#EUW" || pl.us[0].agent !== "Killjoy") throw new Error("bad player entry");
   if (!m.looksLikeScrim(pl, { prefix: "XPE", min: 3, modes: ["custom"] })) throw new Error("5-XPE custom should pass the filter");
+
+  // customs often omit gameName/tagLine -> names resolved by puuid via nameMap
+  const noNames = { ...md, players: md.players.map((p) => ({ ...p, gameName: "", tagLine: "" })) };
+  const nameMap = { me: "XPE nix#EUW", p2: "XPE b#EU", p3: "XPE c#EU", p4: "XPE d#EU", p5: "XPE e#EU", e1: "Foe#EU" };
+  const pl2 = m.buildPayload(noNames, "me", nameMap);
+  if (pl2.us[0].riotId !== "XPE nix#EUW") throw new Error("name-service fallback not applied");
+  if (m.buildPayload(noNames, "me").us[0].riotId !== "") throw new Error("missing name should be empty, not 'undefined#undefined'");
   const rs = m.regionShardFromLog("x https://glz-eu-1.eu.a.pvp.net/y");
   if (!rs || rs.region !== "eu") throw new Error("region parse");
   if (m.versionFromLog("CI server version: release-13.05-shipping-11-5350494\n") !== "release-13.05-shipping-11-5350494") throw new Error("version parse");
