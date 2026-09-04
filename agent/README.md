@@ -25,7 +25,10 @@ Two ways to run it:
    ends it fetches `match-details/v1/matches/<id>`. Custom games often come back
    with blank `gameName`/`tagLine`, so it resolves any missing names by puuid via
    `PUT name-service/v2/players`, normalises, and `POST`s to
-   `<sightlineUrl>/api/import/match` with your ingest key.
+   `<sightlineUrl>/api/import/match`. Auth is a per-team **ingest key**
+   (`config.json` / `SIGHTLINE_INGEST_KEY`) for standalone use, or — inside the
+   desktop app — the user's login session (`SIGHTLINE_SESSION` + `SIGHTLINE_TEAM`,
+   set automatically), so a player never handles a shared key.
 
 Sightline de-dupes on the match id (a match can't import twice) and only keeps
 customs with `N`+ prefix-tagged players on one team — set both on the website

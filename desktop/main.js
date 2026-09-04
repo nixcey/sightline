@@ -6,7 +6,7 @@
  * is present (see preload.js). The agent is OFF until the user starts it (or
  * "start with the app" is enabled).
  */
-const { app, BrowserWindow, ipcMain, shell, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Menu, session } = require("electron");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -44,25 +44,48 @@ function pushLog(stream, line) {
 }
 function statusPayload() {
   const c = readCfg();
-  return { platform: process.platform, running: !!agentProc, hasKey: !!c.ingestKey, autostart: !!c.autostart, pollSeconds: c.pollSeconds || 20 };
+  return {
+    platform: process.platform,
+    running: !!agentProc,
+    hasKey: !!c.ingestKey,
+    autostart: !!c.autostart,
+    pollSeconds: c.pollSeconds || 20,
+  };
 }
 
-function startAgent({ ingestKey, pollSeconds } = {}) {
+// the sid cookie from the logged-in web view — lets the agent import as the
+// current user with no shared ingest key
+async function sessionCookie() {
+  try {
+    const jar = await session.defaultSession.cookies.get({ url: SITE_URL, name: "sid" });
+    return jar && jar[0] ? jar[0].value : "";
+  } catch { return ""; }
+}
+
+async function startAgent({ ingestKey, pollSeconds, teamId } = {}) {
   if (process.platform !== "win32") return { error: "the agent only runs on Windows" };
   if (agentProc) return statusPayload();
   const patch = {};
   if (ingestKey) patch.ingestKey = String(ingestKey).trim();
   if (pollSeconds) patch.pollSeconds = Number(pollSeconds) || 20;
+  if (teamId) patch.teamId = String(teamId).trim();
   const c = Object.keys(patch).length ? writeCfg(patch) : readCfg();
-  if (!c.ingestKey) return { error: "no ingest key set" };
 
-  pushLog("out", "— starting agent —");
+  // prefer a real ingest key if one was pasted; otherwise ride the login session
+  const sid = c.ingestKey ? "" : await sessionCookie();
+  if (!c.ingestKey && !(sid && c.teamId)) {
+    return { error: "sign in on the Sightline tab first (the agent uses your session)" };
+  }
+
+  pushLog("out", c.ingestKey ? "— starting agent (ingest key) —" : "— starting agent (signed-in session) —");
   agentProc = spawn(process.execPath, [agentScript()], {
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: "1",
       SIGHTLINE_URL: SITE_URL,
-      SIGHTLINE_INGEST_KEY: c.ingestKey,
+      ...(c.ingestKey
+        ? { SIGHTLINE_INGEST_KEY: c.ingestKey }
+        : { SIGHTLINE_SESSION: sid, SIGHTLINE_TEAM: c.teamId }),
       SIGHTLINE_POLL_SECONDS: String(c.pollSeconds || 20),
       SIGHTLINE_STATE: statePath(),
     },
@@ -112,7 +135,9 @@ function createWindow() {
   });
   win.webContents.on("did-finish-load", () => {
     const c = readCfg();
-    if (process.platform === "win32" && c.autostart && c.ingestKey && !agentProc) startAgent();
+    if (process.platform === "win32" && c.autostart && !agentProc && (c.ingestKey || c.teamId)) {
+      startAgent().catch(() => {});
+    }
   });
 }
 

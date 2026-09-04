@@ -24,6 +24,73 @@ const readJson = async (c) => {
 };
 const bad = (c, msg, code = 400) => c.json({ error: msg }, code);
 
+// trim + strip control chars + hard length cap on any free-text field we store
+const clampStr = (v, max = 200) =>
+  String(v ?? "").replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, max);
+
+const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
+
+const ALLOWED_REGIONS = new Set(["eu", "na", "ap", "kr", "latam", "br"]);
+const ALLOWED_SERVERS = new Set(["EU", "NA", "APAC", "BR", "LATAM", "KR"]);
+const PLAYER_STATUS = new Set(["Starter", "Sub", "Trial", "Inactive"]);
+const cleanRiotId = (r) => {
+  if (!r || typeof r !== "object") return null;
+  const region = String(r.region || "").toLowerCase();
+  return {
+    name: clampStr(r.name, 32),
+    tag: clampStr(r.tag, 8).replace(/^#/, ""),
+    region: ALLOWED_REGIONS.has(region) ? region : "",
+  };
+};
+const cleanRank = (r) => {
+  if (!r || typeof r !== "object") return null;
+  return { tier: clampStr(r.tier, 16), div: clampInt(r.div, 1, 3), rr: clampInt(r.rr, 0, 999) };
+};
+// sanitise one player field before it hits the DB (defends the frontend against
+// stored XSS via handle/icon and caps every free-text field)
+const noTags = (s) => String(s).replace(/[<>]/g, "");
+function cleanPlayerVal(f, v) {
+  switch (f) {
+    case "handle": return noTags(clampStr(v, 40)) || "New player";
+    case "name": return noTags(clampStr(v, 60));
+    case "role": return noTags(clampStr(v, 20)) || "Flex";
+    case "icon": return noTags(clampStr(v, 16));
+    case "note": return clampStr(v, 4000);
+    case "joined": return clampStr(v, 20);
+    case "status": return PLAYER_STATUS.has(v) ? v : "Trial";
+    case "agents": return JSON.stringify((Array.isArray(v) ? v : []).map((a) => clampStr(a, 24)).filter(Boolean).slice(0, 25));
+    case "rank": return v == null ? null : JSON.stringify(cleanRank(v));
+    case "riotId": return v == null ? null : JSON.stringify(cleanRiotId(v));
+    default: return v;
+  }
+}
+
+// ---------------------------------------------------------------- rate limiting
+const clientIp = (c) =>
+  c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "unknown";
+
+// fixed-window counter in D1. Returns { ok } or { ok:false, retryAfter }.
+async function rateLimit(db, key, max, windowMs) {
+  const t = Date.now();
+  const row = await db.prepare("SELECT count, window_at FROM rate_limits WHERE bucket = ?").bind(key).first();
+  if (!row || t - row.window_at >= windowMs) {
+    await db
+      .prepare(
+        "INSERT INTO rate_limits (bucket,count,window_at) VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET count = 1, window_at = ?",
+      )
+      .bind(key, t, t).run();
+    if (Math.random() < 0.02) {
+      await db.prepare("DELETE FROM rate_limits WHERE window_at < ?").bind(t - 86_400_000).run().catch(() => {});
+    }
+    return { ok: true };
+  }
+  if (row.count >= max) return { ok: false, retryAfter: Math.ceil((row.window_at + windowMs - t) / 1000) };
+  await db.prepare("UPDATE rate_limits SET count = count + 1 WHERE bucket = ?").bind(key).run();
+  return { ok: true };
+}
+const tooMany = (c, r, msg = "too many attempts — slow down") =>
+  c.json({ error: msg, retryAfter: r.retryAfter }, 429, { "Retry-After": String(r.retryAfter || 60) });
+
 // ---------------------------------------------------------------- Discord notifications
 const DISCORD_RE = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+/;
 const COLOR = { good: 0x3ad1bf, bad: 0xf0656e, gold: 0xe7a343, accent: 0xff4655, grey: 0x767c86 };
@@ -64,7 +131,8 @@ async function notifyTeam(c, teamRowOrId, payload) {
 // roles: accept a `roles` array (multi-select) or a legacy single `role`;
 // return both the JSON array and roles[0] for the plain `role` column.
 const splitRoles = (b, fallback = "Flex") => {
-  const r = Array.isArray(b.roles) ? b.roles.filter(Boolean) : b.role ? [b.role] : [];
+  const src = Array.isArray(b.roles) ? b.roles : b.role ? [b.role] : [];
+  const r = src.map((x) => clampStr(x, 20)).filter(Boolean).slice(0, 8);
   return { roles: JSON.stringify(r), role: r[0] || fallback };
 };
 
@@ -159,6 +227,8 @@ app.get("/api/auth/state", async (c) => {
 });
 
 app.post("/api/auth/bootstrap", async (c) => {
+  const rl = await rateLimit(c.env.DB, `bootstrap:${clientIp(c)}`, 5, 3_600_000);
+  if (!rl.ok) return tooMany(c, rl);
   const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM users").first();
   if (n.n > 0) return bad(c, "the first account already exists — sign in", 403);
   const b = await readJson(c);
@@ -176,11 +246,23 @@ app.post("/api/auth/bootstrap", async (c) => {
 
 app.post("/api/auth/login", async (c) => {
   const b = await readJson(c);
-  const u = await c.env.DB.prepare("SELECT * FROM users WHERE email = ?")
-    .bind((b.email || "").toLowerCase().trim())
-    .first();
-  if (!u || !(await auth.verifyPassword(b.password || "", u.pw_hash, u.pw_salt)))
-    return bad(c, "wrong email or password", 401);
+  const email = (b.email || "").toLowerCase().trim();
+  // brute-force limits: per IP (spray protection, generous for shared NAT) and
+  // per targeted email (the real anti-guessing gate)
+  const ipRl = await rateLimit(c.env.DB, `login:ip:${clientIp(c)}`, 40, 600_000);
+  if (!ipRl.ok) return tooMany(c, ipRl, "too many sign-in attempts from your network — try again shortly");
+  const emRl = await rateLimit(c.env.DB, `login:em:${email}`, 10, 900_000);
+  if (!emRl.ok) return tooMany(c, emRl, "too many sign-in attempts for this account — wait a few minutes");
+
+  const u = await c.env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+  // spend PBKDF2 time whether or not the account exists (no timing oracle)
+  const okPw = u
+    ? await auth.verifyPassword(b.password || "", u.pw_hash, u.pw_salt)
+    : (await auth.hashPassword(b.password || "", auth.DUMMY_SALT), false);
+  if (!u || !okPw) return bad(c, "wrong email or password", 401);
+  // a correct password clears the per-email counter so a fat-fingering user
+  // isn't locked out; a brute-forcer never gets here so theirs keeps climbing
+  await c.env.DB.prepare("DELETE FROM rate_limits WHERE bucket = ?").bind(`login:em:${email}`).run().catch(() => {});
   await setSession(c, u.id);
   return c.json({ ok: true });
 });
@@ -236,6 +318,8 @@ app.post("/api/me/password", requireUser, async (c) => {
 
 // ================================================================ invites (public)
 app.get("/api/invites/:code", async (c) => {
+  const rl = await rateLimit(c.env.DB, `invlook:${clientIp(c)}`, 30, 600_000);
+  if (!rl.ok) return tooMany(c, rl);
   const iv = await c.env.DB.prepare(
     "SELECT i.*, t.name AS teamName FROM invites i JOIN teams t ON t.id = i.team_id WHERE i.code = ?",
   )
@@ -248,19 +332,22 @@ app.get("/api/invites/:code", async (c) => {
 });
 
 app.post("/api/invites/:code/accept", async (c) => {
+  const rl = await rateLimit(c.env.DB, `invaccept:${clientIp(c)}`, 10, 3_600_000);
+  if (!rl.ok) return tooMany(c, rl);
   const b = await readJson(c);
   const code = c.req.param("code");
   const iv = await c.env.DB.prepare("SELECT * FROM invites WHERE code = ?").bind(code).first();
   if (!iv || iv.used_by || iv.expires_at < now()) return bad(c, "invite is invalid or already used", 410);
   const email = (iv.email || b.email || "").toLowerCase().trim();
-  if (!email || !b.password || !b.name) return bad(c, "name, email and password are required");
+  const name = noTags(clampStr(b.name, 60));
+  if (!email || !b.password || !name) return bad(c, "name, email and password are required");
   if (b.password.length < 8) return bad(c, "password must be at least 8 characters");
   if (await c.env.DB.prepare("SELECT 1 FROM users WHERE email = ?").bind(email).first())
     return bad(c, "an account with that email already exists", 409);
   const { hash, salt } = await auth.hashPassword(b.password);
   const uid = nid(8);
   await c.env.DB.prepare("INSERT INTO users (id,email,name,pw_hash,pw_salt,created_at) VALUES (?,?,?,?,?,?)")
-    .bind(uid, email, b.name.trim(), hash, salt, now())
+    .bind(uid, email, name, hash, salt, now())
     .run();
   await c.env.DB.batch([
     c.env.DB.prepare("INSERT INTO team_members (team_id,user_id,role,player_id,created_at) VALUES (?,?,?,?,?)").bind(
@@ -276,6 +363,17 @@ app.post("/api/invites/:code/accept", async (c) => {
   return c.json({ ok: true, teamId: iv.team_id });
 });
 
+// a `player`-role membership is exclusive: that user only ever sees the one team.
+// staff (igl / manager) may sit on several. Returns an error string, or null.
+async function multiTeamBlock(db, userId, incomingRole) {
+  const rows = await db.prepare("SELECT role FROM team_members WHERE user_id = ?").bind(userId).all();
+  if (!rows.results.length) return null;
+  if (incomingRole === "player") return "players can only belong to one team";
+  if (rows.results.some((r) => r.role === "player"))
+    return "you're a player on another team — leave that team before joining another";
+  return null;
+}
+
 app.post("/api/teams/join", requireUser, async (c) => {
   const b = await readJson(c);
   const iv = await c.env.DB.prepare("SELECT * FROM invites WHERE code = ?").bind(b.code || "").first();
@@ -283,6 +381,8 @@ app.post("/api/teams/join", requireUser, async (c) => {
   const u = c.get("user");
   if (await c.env.DB.prepare("SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?").bind(iv.team_id, u.id).first())
     return bad(c, "you're already on this team", 409);
+  const mtb = await multiTeamBlock(c.env.DB, u.id, iv.role);
+  if (mtb) return bad(c, mtb, 403);
   await c.env.DB.batch([
     c.env.DB.prepare("INSERT INTO team_members (team_id,user_id,role,player_id,created_at) VALUES (?,?,?,?,?)").bind(
       iv.team_id,
@@ -299,10 +399,13 @@ app.post("/api/teams/join", requireUser, async (c) => {
 // ================================================================ teams
 app.post("/api/teams", requireUser, async (c) => {
   const b = await readJson(c);
-  if (!b.name) return bad(c, "team name is required");
+  const name = clampStr(b.name, 60);
+  if (!name) return bad(c, "team name is required");
+  const mtb = await multiTeamBlock(c.env.DB, c.get("user").id, "manager");
+  if (mtb) return bad(c, mtb, 403);
   const id = nid(8);
   await c.env.DB.prepare("INSERT INTO teams (id,name,tag,server,created_at) VALUES (?,?,?,?,?)")
-    .bind(id, b.name.trim(), (b.tag || b.name.slice(0, 4).toUpperCase()).trim(), b.server || "EU", now())
+    .bind(id, name, clampStr(b.tag || name.slice(0, 4).toUpperCase(), 8), ALLOWED_SERVERS.has(b.server) ? b.server : "EU", now())
     .run();
   await c.env.DB.prepare("INSERT INTO team_members (team_id,user_id,role,created_at) VALUES (?,?,?,?)")
     .bind(id, c.get("user").id, "manager", now())
@@ -369,12 +472,12 @@ app.put("/api/teams/:id", team("igl"), async (c) => {
   const b = await readJson(c);
   const sets = [], vals = [];
   const put = (col, v) => { sets.push(`${col}=?`); vals.push(v); };
-  if ("name" in b) put("name", String(b.name).trim());
-  if ("tag" in b) put("tag", String(b.tag).trim());
-  if ("server" in b) put("server", b.server);
+  if ("name" in b) put("name", noTags(clampStr(b.name, 60)) || "Team");
+  if ("tag" in b) put("tag", noTags(clampStr(b.tag, 8)));
+  if ("server" in b) put("server", ALLOWED_SERVERS.has(b.server) ? b.server : "EU");
   if ("scrimGoal" in b) put("scrim_goal", JSON.stringify(b.scrimGoal || { base: 1, tournament: 3 }));
   if ("tournamentWeeks" in b) put("tournament_weeks", JSON.stringify(b.tournamentWeeks || []));
-  if ("importPrefix" in b) put("import_prefix", String(b.importPrefix || "").trim());
+  if ("importPrefix" in b) put("import_prefix", clampStr(b.importPrefix, 16));
   if ("importMin" in b) put("import_min", Math.max(1, Math.min(5, Math.round(Number(b.importMin) || 3))));
   if (!sets.length) return c.json({ ok: true });
   const id = c.req.param("id");
@@ -505,8 +608,14 @@ app.put("/api/teams/:id/members/:userId", team("igl"), async (c) => {
   const { id, userId } = c.req.param();
   if (b.role && b.role !== "manager" && !(await guardLastManager(c.env.DB, id, userId)))
     return bad(c, "the team needs at least one manager");
+  // can't demote someone to `player` while they belong to more than one team
+  if (b.role === "player") {
+    const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM team_members WHERE user_id = ?").bind(userId).first();
+    if (n.n > 1) return bad(c, "that member is on more than one team — players must be single-team", 409);
+  }
+  const playerId = b.playerId ? clampStr(b.playerId, 16) : null;
   await c.env.DB.prepare("UPDATE team_members SET role = COALESCE(?, role), player_id = ? WHERE team_id = ? AND user_id = ?")
-    .bind(["manager", "igl", "player"].includes(b.role) ? b.role : null, b.playerId ?? null, id, userId)
+    .bind(["manager", "igl", "player"].includes(b.role) ? b.role : null, playerId, id, userId)
     .run();
   return c.json({ ok: true });
 });
@@ -532,17 +641,17 @@ app.post("/api/teams/:id/players", team("igl"), async (c) => {
     .bind(
       pid,
       id,
-      b.handle || "New player",
-      b.name || "",
+      cleanPlayerVal("handle", b.handle),
+      cleanPlayerVal("name", b.name),
       pr.role,
       pr.roles,
-      b.status || "Trial",
-      b.icon || "🎯",
-      b.joined || "",
-      JSON.stringify(b.agents || []),
-      b.rank ? JSON.stringify(b.rank) : null,
-      b.riotId ? JSON.stringify(b.riotId) : null,
-      b.note || "",
+      "status" in b ? cleanPlayerVal("status", b.status) : "Trial",
+      "icon" in b ? cleanPlayerVal("icon", b.icon) : "🎯",
+      cleanPlayerVal("joined", b.joined),
+      cleanPlayerVal("agents", b.agents),
+      b.rank ? cleanPlayerVal("rank", b.rank) : null,
+      b.riotId ? cleanPlayerVal("riotId", b.riotId) : null,
+      cleanPlayerVal("note", b.note),
       n.n,
     )
     .run();
@@ -576,7 +685,7 @@ app.put("/api/teams/:id/players/:pid", team("player"), async (c) => {
     if (!(f in b)) continue;
     if (f === "role" && "roles" in b) continue; // handled below
     sets.push(`${PLAYER_COL[f]} = ?`);
-    vals.push(["agents", "rank", "riotId"].includes(f) ? (b[f] == null ? null : JSON.stringify(b[f])) : b[f]);
+    vals.push(cleanPlayerVal(f, b[f]));
   }
   if ("roles" in b) {
     const pr = splitRoles(b, "Flex");
@@ -637,20 +746,33 @@ app.delete("/api/teams/:id/players/:pid/notes/:noteId", team("player"), async (c
 
 // ================================================================ scrims
 const scrimKind = (v) => (v === "official" ? "official" : "scrim");
-const cleanVods = (v) => (Array.isArray(v) ? v.map((u) => String(u || "").trim()).filter(Boolean).slice(0, 8) : []);
+const cleanVods = (v) =>
+  (Array.isArray(v) ? v.map((u) => clampStr(u, 300)).filter((u) => /^https?:\/\//i.test(u)).slice(0, 8) : []);
+const cleanLineup = (v) =>
+  (Array.isArray(v) ? v.slice(0, 12).map((l) => ({
+    pid: l && l.pid ? clampStr(l.pid, 16) : null,
+    name: l && !l.pid && l.name ? clampStr(l.name, 40) : undefined,
+    agent: clampStr(l && l.agent, 24),
+    k: clampInt(l && l.k, 0, 200), d: clampInt(l && l.d, 0, 200), a: clampInt(l && l.a, 0, 200),
+    adr: l && l.adr == null ? null : clampInt(l && l.adr, 0, 400),
+    kast: l && l.kast == null ? null : clampInt(l && l.kast, 0, 100),
+    present: !!(l && l.present),
+  })) : []);
 
 app.post("/api/teams/:id/scrims", team("igl"), async (c) => {
   const b = await readJson(c);
   const id = c.req.param("id");
   const sid = nid(8);
   const kind = scrimKind(b.kind);
-  const rw = +b.rw || 0, rl = +b.rl || 0;
+  const opp = clampStr(b.opp, 60) || "TBD";
+  const map = clampStr(b.map, 24);
+  const rw = clampInt(b.rw, 0, 99), rl = clampInt(b.rl, 0, 99);
   await c.env.DB.prepare("INSERT INTO scrims (id,team_id,date,opp,map,rw,rl,lineup,kind,vods,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-    .bind(sid, id, b.date, b.opp || "TBD", b.map, rw, rl, JSON.stringify(b.lineup || []), kind, JSON.stringify(cleanVods(b.vods)), now())
+    .bind(sid, id, clampStr(b.date, 20), opp, map, rw, rl, JSON.stringify(cleanLineup(b.lineup)), kind, JSON.stringify(cleanVods(b.vods)), now())
     .run();
   await notifyTeam(c, id, {
     embeds: [{
-      title: `${kind === "official" ? "🏆 Official" : "⚔️ Scrim"} · ${b.map} vs ${b.opp || "TBD"}`,
+      title: `${kind === "official" ? "🏆 Official" : "⚔️ Scrim"} · ${map} vs ${opp}`,
       description: `**${rw}–${rl}** ${rw > rl ? "win" : rw < rl ? "loss" : "draw"}`,
       color: rw > rl ? COLOR.good : rw < rl ? COLOR.bad : COLOR.grey,
     }],
@@ -662,7 +784,8 @@ app.put("/api/teams/:id/scrims/:sid", team("igl"), async (c) => {
   const b = await readJson(c);
   const { id, sid } = c.req.param();
   await c.env.DB.prepare("UPDATE scrims SET date=?, opp=?, map=?, rw=?, rl=?, lineup=?, kind=?, vods=? WHERE team_id=? AND id=?")
-    .bind(b.date, b.opp || "TBD", b.map, +b.rw || 0, +b.rl || 0, JSON.stringify(b.lineup || []), scrimKind(b.kind), JSON.stringify(cleanVods(b.vods)), id, sid)
+    .bind(clampStr(b.date, 20), clampStr(b.opp, 60) || "TBD", clampStr(b.map, 24), clampInt(b.rw, 0, 99), clampInt(b.rl, 0, 99),
+      JSON.stringify(cleanLineup(b.lineup)), scrimKind(b.kind), JSON.stringify(cleanVods(b.vods)), id, sid)
     .run();
   return c.json({ ok: true });
 });
@@ -756,6 +879,12 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
 
 // ================================================================ tryouts
 const tryoutRoles = (b) => splitRoles(b, "Flex");
+const cleanAgents = (v) =>
+  JSON.stringify((Array.isArray(v) ? v : []).map((a) => clampStr(a, 24)).filter(Boolean).slice(0, 25));
+const cleanScores = (v) => {
+  const s = v && typeof v === "object" ? v : {};
+  return JSON.stringify(Object.fromEntries(["mech", "util", "comms", "att"].map((k) => [k, clampInt(s[k], 0, 10)])));
+};
 
 app.post("/api/teams/:id/tryouts", team("igl"), async (c) => {
   const b = await readJson(c);
@@ -764,8 +893,8 @@ app.post("/api/teams/:id/tryouts", team("igl"), async (c) => {
   await c.env.DB.prepare(
     "INSERT INTO tryouts (id,team_id,date,handle,role,roles,tier,div,agents,scores,verdict,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
   )
-    .bind(tid, c.req.param("id"), b.date, b.handle || "", role, roles, b.tier || "Immortal", +b.div || 1,
-      JSON.stringify(b.agents || []), JSON.stringify(b.scores || {}), b.verdict || "Hold", b.notes || "")
+    .bind(tid, c.req.param("id"), clampStr(b.date, 20), clampStr(b.handle, 40), role, roles, clampStr(b.tier, 16) || "Immortal", clampInt(b.div, 1, 3),
+      cleanAgents(b.agents), cleanScores(b.scores), clampStr(b.verdict, 16) || "Hold", clampStr(b.notes, 4000))
     .run();
   return c.json({ id: tid });
 });
@@ -777,8 +906,8 @@ app.put("/api/teams/:id/tryouts/:tid", team("igl"), async (c) => {
   await c.env.DB.prepare(
     "UPDATE tryouts SET date=?, handle=?, role=?, roles=?, tier=?, div=?, agents=?, scores=?, verdict=?, notes=? WHERE team_id=? AND id=?",
   )
-    .bind(b.date, b.handle || "", role, roles, b.tier || "Immortal", +b.div || 1,
-      JSON.stringify(b.agents || []), JSON.stringify(b.scores || {}), b.verdict || "Hold", b.notes || "", id, tid)
+    .bind(clampStr(b.date, 20), clampStr(b.handle, 40), role, roles, clampStr(b.tier, 16) || "Immortal", clampInt(b.div, 1, 3),
+      cleanAgents(b.agents), cleanScores(b.scores), clampStr(b.verdict, 16) || "Hold", clampStr(b.notes, 4000), id, tid)
     .run();
   return c.json({ ok: true });
 });
@@ -852,15 +981,30 @@ app.put("/api/teams/:id/activities/months/:mk", team("igl"), async (c) => {
   return c.json({ ok: true });
 });
 
-// ================================================================ scrim import (Overwolf)
-// Authenticated by the team's ingest key (Authorization: Bearer sk_...), not a user session.
-async function bearerTeam(c) {
+// ================================================================ scrim import
+// Two auth modes:
+//   1. team ingest key  — Authorization: Bearer sk_...  (headless / standalone agent)
+//   2. signed-in session — sid cookie + ?team=<id>, caller must be a team member
+//      (the desktop app runs the agent under the logged-in user; no shared secret
+//      ever reaches a player).
+async function resolveImportTeam(c) {
   const h = c.req.header("authorization") || "";
   const key = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
-  if (!key || !key.startsWith("sk_")) return null;
-  return (await c.env.DB.prepare("SELECT * FROM teams WHERE ingest_key = ?").bind(key).first()) || null;
+  if (key.startsWith("sk_")) {
+    const t = await c.env.DB.prepare("SELECT * FROM teams WHERE ingest_key = ?").bind(key).first();
+    return t ? { team: t, via: "key" } : null;
+  }
+  const u = c.get("user");
+  const teamId = clampStr(c.req.query("team"), 16);
+  if (u && teamId) {
+    const m = await c.env.DB.prepare("SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?").bind(teamId, u.id).first();
+    if (m) {
+      const t = await c.env.DB.prepare("SELECT * FROM teams WHERE id = ?").bind(teamId).first();
+      if (t) return { team: t, via: "session" };
+    }
+  }
+  return null;
 }
-const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
 const AGENT_ALIAS = { kayo: "KAY/O", "kay/o": "KAY/O", "kay-o": "KAY/O" };
 function normAgent(a) {
   if (!a) return "";
@@ -873,17 +1017,21 @@ const importPrefix = (t) => (t.import_prefix || t.tag || "").trim();
 const importMin = (t) => (t.import_min == null ? 3 : t.import_min);
 
 app.get("/api/import/ping", async (c) => {
-  const t = await bearerTeam(c);
-  if (!t) return c.json({ error: "invalid ingest key" }, 401);
-  return c.json({ ok: true, team: t.name, tag: t.tag, prefix: importPrefix(t), min: importMin(t) });
+  const rt = await resolveImportTeam(c);
+  if (!rt) return c.json({ error: "not authorized — need an ingest key or a signed-in session" }, 401);
+  const t = rt.team;
+  return c.json({ ok: true, team: t.name, tag: t.tag, prefix: importPrefix(t), min: importMin(t), via: rt.via });
 });
 
 app.post("/api/import/match", async (c) => {
-  const t = await bearerTeam(c);
-  if (!t) return c.json({ error: "invalid ingest key" }, 401);
+  const rt = await resolveImportTeam(c);
+  if (!rt) return c.json({ error: "not authorized — need an ingest key or a signed-in session" }, 401);
+  const t = rt.team;
+  const rlim = await rateLimit(c.env.DB, `import:${t.id}`, 120, 600_000);
+  if (!rlim.ok) return c.json({ imported: false, reason: "rate limited — try again shortly" }, 429);
   const b = await readJson(c);
 
-  const matchId = (b.matchId || b.match_id || "").toString().trim();
+  const matchId = clampStr(b.matchId || b.match_id, 64);
   if (!matchId) return c.json({ error: "matchId is required (needed to prevent duplicate imports)" }, 400);
 
   const dup = await c.env.DB.prepare("SELECT id FROM scrims WHERE team_id = ? AND match_id = ?").bind(t.id, matchId).first();
@@ -990,10 +1138,41 @@ app.post("/api/import/match", async (c) => {
 app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
 
 // ---------------------------------------------------------------- entry
+// CSP: script-src is 'self' only (no 'unsafe-inline') so injected markup like
+// <img onerror=…> can't execute. style-src keeps 'unsafe-inline' (the app uses
+// inline style="" widely; style injection isn't code execution) plus Google
+// Fonts. connect-src 'self' — the API and app share one origin.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+].join("; ");
+
+function harden(res, isHttps) {
+  const h = new Headers(res.headers);
+  h.set("Content-Security-Policy", CSP);
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("X-Frame-Options", "DENY");
+  h.set("Referrer-Policy", "same-origin");
+  h.set("Cross-Origin-Opener-Policy", "same-origin");
+  h.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  if (isHttps) h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+}
+
 export default {
-  fetch(request, env, ctx) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) return app.fetch(request, env, ctx);
-    return env.ASSETS.fetch(request);
+    const res = url.pathname.startsWith("/api/")
+      ? await app.fetch(request, env, ctx)
+      : await env.ASSETS.fetch(request);
+    return harden(res, url.protocol === "https:");
   },
 };

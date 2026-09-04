@@ -57,17 +57,29 @@ function loadConfig() {
   }
   c.sightlineUrl = String(process.env.SIGHTLINE_URL || c.sightlineUrl || "").replace(/\/+$/, "");
   c.ingestKey = String(process.env.SIGHTLINE_INGEST_KEY || c.ingestKey || "").trim();
+  // session auth (desktop app): the agent rides the logged-in user's session, so
+  // no ingest key — nothing secret to hand a player.
+  c.session = String(process.env.SIGHTLINE_SESSION || c.session || "").trim();
+  c.team = String(process.env.SIGHTLINE_TEAM || c.team || "").trim();
   c.pollSeconds = Math.max(10, Number(process.env.SIGHTLINE_POLL_SECONDS || c.pollSeconds) || 20);
-  if (!c.sightlineUrl || !c.ingestKey) {
+  const haveAuth = c.ingestKey || (c.session && c.team);
+  if (!c.sightlineUrl || !haveAuth) {
     console.error(
       `\nMissing config. Either create ${CFG_PATH} :\n\n` +
         `  {\n    "sightlineUrl": "https://sightline.nixcey.com",\n    "ingestKey": "sk_...",\n    "pollSeconds": 20\n  }\n\n` +
         `or set SIGHTLINE_URL and SIGHTLINE_INGEST_KEY in the environment.\n` +
-        `Get the ingest key from Sightline -> Scrims -> Scrim importer.\n`,
+        `Get the ingest key from Sightline -> Scrims -> Scrim importer.\n` +
+        `(The desktop app instead passes SIGHTLINE_SESSION + SIGHTLINE_TEAM automatically.)\n`,
     );
     process.exit(1);
   }
   return c;
+}
+// auth headers + URL suffix for a call to Sightline's import API
+function slAuth(cfg) {
+  return cfg.ingestKey
+    ? { headers: { Authorization: "Bearer " + cfg.ingestKey }, qs: "" }
+    : { headers: { Cookie: "sid=" + cfg.session }, qs: "?team=" + encodeURIComponent(cfg.team) };
 }
 const readState = () => {
   try { return JSON.parse(fs.readFileSync(STATE_PATH, "utf8")); } catch { return {}; }
@@ -267,17 +279,17 @@ function buildPayload(md, myPuuid, nameMap = {}) {
 
 /* ------------------------------------------------------------------ Sightline */
 async function slPing(cfg) {
-  const r = await fetch(cfg.sightlineUrl + "/api/import/ping", {
-    headers: { Authorization: "Bearer " + cfg.ingestKey },
-  });
+  const a = slAuth(cfg);
+  const r = await fetch(cfg.sightlineUrl + "/api/import/ping" + a.qs, { headers: a.headers });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
   return d; // { team, tag, prefix, min }
 }
 async function slImport(cfg, payload) {
-  const r = await fetch(cfg.sightlineUrl + "/api/import/match", {
+  const a = slAuth(cfg);
+  const r = await fetch(cfg.sightlineUrl + "/api/import/match" + a.qs, {
     method: "POST",
-    headers: { "content-type": "application/json", Authorization: "Bearer " + cfg.ingestKey },
+    headers: { "content-type": "application/json", ...a.headers },
     body: JSON.stringify(payload),
   });
   const d = await r.json().catch(() => ({}));

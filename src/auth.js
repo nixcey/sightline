@@ -32,6 +32,10 @@ export async function hashPassword(password, saltHex) {
   return { hash: bufToHex(bits), salt: bufToHex(salt) };
 }
 
+// Used by the login route to spend the same PBKDF2 time when the email doesn't
+// exist, so response timing can't be used to enumerate registered emails.
+export const DUMMY_SALT = "00000000000000000000000000000000";
+
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let r = 0;

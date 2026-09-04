@@ -35,15 +35,27 @@ companion app.
   read-only except: own roster-player identity/prefs, own schedule blocks, own
   account, own performance notes. The server's `team(minRole)` middleware and the
   per-field `allowed` lists are the real gate; UI helpers just hide controls.
+  A `player`-role account is single-team (`multiTeamBlock()` on join/create);
+  staff may be multi-team.
+- **Security:** `clampStr` / `noTags` / `cleanPlayerVal` sanitise every stored
+  free-text field — do this for any new user-writable column. Render user data
+  through `esc()` on the frontend (CSP `script-src 'self'` from `public/_headers`
+  is the backstop; no inline `on*=` handlers — use `data-*` + a delegated
+  listener on `M`). `rateLimit(db, key, max, windowMs)` (D1 `rate_limits`) guards
+  login / bootstrap / invites / import. Login spends equal PBKDF2 time on unknown
+  emails. Security headers: `public/_headers` for assets, `harden()` for `/api/*`.
 - **Persistence** is only D1. The frontend never touches storage directly — every
   mutation goes through `act(API.…)` then refetches `GET /api/teams/:id` (the
   bundle mirrors the old `team()` object).
 - **Rank sync**, **scrim import** and **Discord notifications** run server-side;
   their secrets live in the `teams` row, never in the bundle (`hasRankApiKey` /
   `hasIngestKey` / `hasDiscord` booleans).
-- Scrim import (`POST /api/import/match`, bearer = `teams.ingest_key`) dedupes on
-  `(team_id, match_id)` and only accepts customs with `import_min`+ players whose
-  in-game name matches `import_prefix`.
+- Scrim import (`POST /api/import/match`) dedupes on `(team_id, match_id)` and
+  only accepts customs with `import_min`+ players whose in-game name matches
+  `import_prefix`. Auth is either `Bearer sk_…` (`teams.ingest_key`, headless) or
+  a signed-in session + `?team=<id>` (`resolveImportTeam()`) — the desktop agent
+  uses the latter so no key reaches a player. `agent/` reads `SIGHTLINE_SESSION`
+  + `SIGHTLINE_TEAM` (desktop passes the `sid` cookie) or `SIGHTLINE_INGEST_KEY`.
 - **Rank tracking:** `POST /api/teams/:id/sync-ranks` refreshes each rostered
   player's `players.rank` *and* backfills `rank_history` (one row per ranked
   match, PK `(team_id, player_id, match_id)` → incremental). The Rank Tracking

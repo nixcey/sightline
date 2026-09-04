@@ -347,7 +347,7 @@ VIEWS_overview=()=>{
           ${flagged.length?flagged.map(r=>`
             <div class="rowline">
               <div style="display:flex;align-items:center;gap:9px">
-                <span style="font-size:16px">${r.p.icon}</span>
+                <span style="font-size:16px">${esc(r.p.icon)}</span>
                 <div><div style="font-family:var(--disp);font-weight:600">${esc(r.p.handle)}</div>
                 <div class="sub">${esc(roleStr(r.p))} · avg R2.0 ${r.rating.toFixed(2)}</div></div>
               </div>
@@ -404,11 +404,12 @@ function statCard(k,v,extra,sub){return `<div class="panel pad cut"><div class="
 function bar(f,good){return `<div class="bar"><i class="${good?'good':''}" style="width:${clamp(f*100,0,100)}%"></i></div>`;}
 function monthBody(k){
   const m=team().activities.months[k];
-  if(!m)return `<div class="sub">No plan for this month.${canEdit()?` <button class="btn ghost sm" onclick="editMonth('${k}')">Add focus</button>`:''}</div>`;
+  const ke=esc(k);
+  if(!m)return `<div class="sub">No plan for this month.${canEdit()?` <button class="btn ghost sm" data-editmonth="${ke}">Add focus</button>`:''}</div>`;
   return `<div class="eyebrow">Theme</div><p style="margin:0 0 12px">${esc(m.theme)||'<span class="sub">—</span>'}</p>
     ${(m.goals||[]).map((g,i)=>`<div class="rowline"><label style="display:flex;gap:8px;align-items:center;${canEdit()?'cursor:pointer':''}">
-      <input type="checkbox" ${g.done?'checked':''} ${canEdit()?`onchange="toggleMonthGoal('${k}',${i})"`:'disabled'}> <span style="${g.done?'text-decoration:line-through;color:var(--ink-3)':''}">${esc(g.text)}</span></label></div>`).join("")}
-    ${canEdit()?`<div style="margin-top:12px"><button class="btn ghost sm" onclick="editMonth('${k}')">Edit month</button></div>`:''}`;
+      <input type="checkbox" ${g.done?'checked':''} ${canEdit()?`data-goaltoggle="${ke}|${i}"`:'disabled'}> <span style="${g.done?'text-decoration:line-through;color:var(--ink-3)':''}">${esc(g.text)}</span></label></div>`).join("")}
+    ${canEdit()?`<div style="margin-top:12px"><button class="btn ghost sm" data-editmonth="${ke}">Edit month</button></div>`:''}`;
 }
 window.toggleMonthGoal=(k,i)=>{
   const m=team().activities.months[k];
@@ -447,7 +448,7 @@ VIEWS_roster=()=>{
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
           ${ps.map(p=>`<div class="pcard">
             <div class="top">
-              <div class="ico">${p.icon||'•'}</div>
+              <div class="ico">${esc(p.icon||'•')}</div>
               <div style="flex:1"><div class="hd">${esc(p.handle)}</div><div class="rl">${esc(roleStr(p))}</div></div>
               ${canEdit()&&p.riotId&&p.riotId.name?`<button class="icar" data-sync="${p.id}" title="Sync rank from Riot ID" ${state.syncing?'disabled':''}>⟳</button>`:''}
               ${canEdit()||isMe(p.id)?`<button class="icar" data-edit="${p.id}" title="Edit">✎</button>`:''}
@@ -584,7 +585,7 @@ VIEWS_schedule=()=>{
             <span class="mono">${DAYS[w.day]} ${m2t(w.start)}–${m2t(w.end)}</span>
             <span class="chip good">${Math.floor(w.mins/60)}h${w.mins%60?(w.mins%60)+'m':''}</span></div>`).join(""):
             `<div class="sub">No windows. Loosen the active window or trim conflicts.</div>`}
-          <div class="callout" style="margin-top:12px">Active players in overlap: <b>${fs.active.map(p=>p.handle).join(", ")}</b></div>
+          <div class="callout" style="margin-top:12px">Active players in overlap: <b>${esc(fs.active.map(p=>p.handle).join(", "))}</b></div>
         </div>
       </div>
     </div>
@@ -653,7 +654,7 @@ VIEWS_activities=()=>{
               <span class="rl">${d}</span>${ed?`<button class="icar" data-addact="${d}">+</button>`:''}</div>
             ${(wk[d]||[]).slice().sort((a,b)=>a.time<b.time?-1:1).map(it=>`
               <div style="border:1px solid var(--border);border-radius:2px;padding:7px;font-size:12px">
-                <div class="mono" style="font-size:10px;color:var(--ink-3)">${it.time} · ${esc(it.type)}</div>
+                <div class="mono" style="font-size:10px;color:var(--ink-3)">${esc(it.time)} · ${esc(it.type)}</div>
                 <div>${esc(it.title)}</div>
                 ${ed?`<button class="icar" style="width:20px;height:20px;font-size:10px;margin-top:4px" data-delact="${d}|${it.id}">✕</button>`:''}
               </div>`).join("")||`<div class="sub" style="font-size:11px">—</div>`}
@@ -663,7 +664,7 @@ VIEWS_activities=()=>{
     </div>
     <div class="p22">
       <div class="panel">
-        <div class="panel-h"><h3>${monthLabel(mk)}</h3>${ed?`<button class="icar" onclick="editMonth('${mk}')">✎</button>`:''}</div>
+        <div class="panel-h"><h3>${monthLabel(mk)}</h3>${ed?`<button class="icar" data-editmonth="${esc(mk)}">✎</button>`:''}</div>
         <div class="panel-b">${monthBody(mk)}</div>
       </div>
       <div class="panel">
@@ -675,7 +676,7 @@ VIEWS_activities=()=>{
               <div class="sub">${esc(m.theme)}</div></div>
               <span class="chip ${done===g.length&&g.length?'good':'accent'}">${done}/${g.length}</span></div>`;
           }).join("")||'<div class="sub">No months planned</div>'}
-          ${ed?`<div style="margin-top:12px"><button class="btn ghost sm" onclick="editMonth('${monthKey(addDays(state.week,32))}')">Add next month →</button></div>`:''}
+          ${ed?`<div style="margin-top:12px"><button class="btn ghost sm" data-editmonth="${esc(monthKey(addDays(state.week,32)))}">Add next month →</button></div>`:''}
         </div>
       </div>
     </div>
@@ -952,8 +953,11 @@ function matchListView(kind){
         list.length?Math.round(wins/list.length*100)+"% win rate":"—")}
       ${statCard(n?"Matches shown":(off?"Logged officials":"Logged scrims"),n?`${list.length}<small>/${all.length}</small>`:list.length,"",n?"of all logged":"all time")}
     </div>
-    ${canEdit()?`<div class="btn-row"><button class="btn" id="addScrim">${icon(off?'trophy':'swords')} Log ${off?'official':'scrim'}</button>
-      ${!off&&canManage()?`<button class="btn ghost" id="scrimImport">⬇ Scrim importer</button>`:''}</div>`:''}
+    ${(canEdit()||(!off&&window.sightlineDesktop&&window.sightlineDesktop.platform==="win32"))?`<div class="btn-row">
+      ${canEdit()?`<button class="btn" id="addScrim">${icon(off?'trophy':'swords')} Log ${off?'official':'scrim'}</button>`:''}
+      ${!off&&canManage()?`<button class="btn ghost" id="scrimImport">⬇ Scrim importer</button>`:''}
+      ${!off&&window.sightlineDesktop&&window.sightlineDesktop.platform==="win32"?`<button class="btn ghost" id="runAgent">▶ Run scrim agent</button>`:''}
+    </div>`:''}
     ${all.length?matchFilterPanel(kind):''}
     <div class="grid">
       ${list.map(s=>{
@@ -973,7 +977,7 @@ function matchListView(kind){
             <thead><tr><th>Player</th><th>Agent</th><th class="num">K</th><th class="num">D</th><th class="num">A</th>
             <th class="num">ADR</th><th class="num">KAST</th><th class="num">R2.0</th><th>Att</th></tr></thead>
             <tbody>${rt.map(r=>`<tr>
-              <td>${pdisp(r).icon} ${esc(pdisp(r).handle)}${r.pid?'':' <span class="chip warn" style="font-size:9px;padding:1px 5px">unlinked</span>'}</td><td>${esc(r.agent)}</td>
+              <td>${esc(pdisp(r).icon)} ${esc(pdisp(r).handle)}${r.pid?'':' <span class="chip warn" style="font-size:9px;padding:1px 5px">unlinked</span>'}</td><td>${esc(r.agent)}</td>
               <td class="num">${r.k}</td><td class="num">${r.d}</td><td class="num">${r.a}</td>
               <td class="num">${Math.round(r.adr)}</td><td class="num">${Math.round(r.kast)}%</td>
               <td class="num ${r.rating==null?'':r.rating>=1.10?'up':r.rating<RATING_BASELINE?'down':''}">${r.rating!=null?r.rating.toFixed(2):'—'}</td>
@@ -990,6 +994,7 @@ function matchListView(kind){
   </div>`;
   const asc=$("#addScrim");if(asc)asc.onclick=()=>editScrim(null,kind);
   const si=$("#scrimImport");if(si)si.onclick=importerDialog;
+  const ra=$("#runAgent");if(ra)ra.onclick=agentDialog;
   M.querySelectorAll("[data-editscrim]").forEach(b=>b.onclick=()=>editScrim(b.dataset.editscrim));
   const panel=$("#mfPanel");
   if(panel){
@@ -1036,22 +1041,8 @@ async function importerDialog(){
     <button class="btn ghost sm" id="imp_save" style="align-self:flex-start">Save filter</button>
     ${winDesktop?`
       <hr style="border:0;border-top:1px solid var(--border);margin:2px 0">
-      <div class="eyebrow">Run the agent on this PC</div>
-      <p class="sub" style="margin:0">You're in the Sightline desktop app. Paste the ingest key once, hit Start — the agent runs in the background while this app is open. No terminal, no Node install.</p>
-      <div class="fld"><label>Ingest key for the agent</label>
-        <div style="display:flex;gap:6px">
-          <input id="ag_key" placeholder="sk_…" style="flex:1" autocomplete="off">
-          <button class="btn" id="ag_toggle">Start</button>
-        </div>
-        <span class="hint" id="ag_state">checking…</span>
-      </div>
-      <label style="display:flex;gap:7px;align-items:center;font-size:12px;color:var(--ink-2);cursor:pointer"><input type="checkbox" id="ag_auto" style="width:auto"> Start the agent automatically when this app opens</label>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span class="eyebrow" style="margin:0">Agent log</span>
-        <button class="btn ghost sm" id="ag_logclear">Clear</button>
-      </div>
-      <pre class="agentlog" id="ag_log"></pre>`:
-      `<div class="callout"><b>The agent</b> is in the repo under <span class="mono">agent/</span> (standalone, needs Node) — or use the <b>Sightline desktop app</b> (Windows/Linux) which runs it for you. See <span class="mono">agent/README.md</span> and <span class="mono">desktop/README.md</span>.</div>`}`;
+      ${agentPanelHTML()}`:
+      `<div class="callout"><b>The agent</b> is in the repo under <span class="mono">agent/</span> (standalone, needs Node + the ingest key above) — or use the <b>Sightline desktop app</b> (Windows/Linux) which runs it for you, signed in as you, with no key. See <span class="mono">agent/README.md</span> and <span class="mono">desktop/README.md</span>.</div>`}`;
   modalShell("Scrim importer",body,null,null,{noSave:true});
   body.querySelector("#cp_url").onclick=()=>copyText(base);
   if(winDesktop) wireDesktopAgent(body);
@@ -1071,11 +1062,36 @@ async function importerDialog(){
   };
   const cp=body.querySelector("#ik_copy"); if(cp)cp.onclick=()=>copyText(body.querySelector("#ik_newval").value);
 }
+/* Desktop scrim agent — runs under the signed-in session (no ingest key ever
+   reaches the machine). Panel is available to any team member on Windows. */
+function agentPanelHTML(){
+  return `
+    <div class="eyebrow">Run the scrim agent on this PC</div>
+    <p class="sub" style="margin:0">Auto-imports finished Valorant customs while you scrim. It runs as <b>you</b> (your Sightline login) — nothing to paste, no key. Keep this window open.</p>
+    <div class="fld"><div style="display:flex;gap:8px;align-items:center">
+      <button class="btn" id="ag_toggle">Start</button>
+      <span class="hint" id="ag_state">checking…</span>
+    </div></div>
+    <label style="display:flex;gap:7px;align-items:center;font-size:12px;color:var(--ink-2);cursor:pointer"><input type="checkbox" id="ag_auto" style="width:auto"> Start automatically when this app opens</label>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="eyebrow" style="margin:0">Agent log</span>
+      <button class="btn ghost sm" id="ag_logclear">Clear</button>
+    </div>
+    <pre class="agentlog" id="ag_log"></pre>`;
+}
+function agentDialog(){
+  const D=window.sightlineDesktop;
+  if(!(D && D.platform==="win32")) return;
+  const body=document.createElement("div");body.className="modal-b";
+  body.innerHTML=agentPanelHTML();
+  modalShell("Scrim agent",body,null,null,{noSave:true});
+  wireDesktopAgent(body);
+}
 let _agentCleanup=[];
 function wireDesktopAgent(body){
   _agentCleanup.forEach(fn=>{try{fn();}catch(e){}}); _agentCleanup=[];
   const D=window.sightlineDesktop;
-  const key=body.querySelector("#ag_key"), tog=body.querySelector("#ag_toggle");
+  const tog=body.querySelector("#ag_toggle");
   const st=body.querySelector("#ag_state"), logEl=body.querySelector("#ag_log");
   const auto=body.querySelector("#ag_auto");
   let running=false;
@@ -1086,8 +1102,7 @@ function wireDesktopAgent(body){
     auto.checked=!!s.autostart;
     st.textContent=running
       ? "running — keep this app open during scrims"
-      : (s.hasKey ? "stopped · key saved (paste a new one to replace it)" : "stopped — paste your ingest key and Start");
-    if(s.hasKey && !key.placeholder.includes("saved")) key.placeholder="sk_•••••••• (saved)";
+      : (s.hasKey ? "stopped — uses the saved ingest key" : "stopped — press Start (imports as you)");
   };
   const append=({stream,line})=>{
     logEl.textContent=(logEl.textContent+line+"\n").split("\n").slice(-300).join("\n");
@@ -1099,9 +1114,8 @@ function wireDesktopAgent(body){
   _agentCleanup.push(D.agent.onLog(append));
   tog.onclick=async()=>{
     if(running){ await D.agent.stop(); return; }
-    const r=await D.agent.start({ ingestKey: key.value.trim() || undefined });
+    const r=await D.agent.start({ teamId: TID() });
     if(r&&r.error) toast(r.error);
-    else key.value="";
   };
   auto.onchange=()=>D.agent.setAutostart(auto.checked).then(paint);
   body.querySelector("#ag_logclear").onclick=()=>{ logEl.textContent=""; };
@@ -1234,7 +1248,7 @@ VIEWS_performance=()=>{
         <thead><tr><th>Player</th><th>Role</th><th>Rank</th><th class="num">Scrims</th><th class="num">Avg KD</th>
         <th class="num">Scrim R2.0</th><th class="num">Δ vs prior</th><th class="num">Off. R2.0</th><th class="num">Off. Δ</th><th>Trend</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>${rows.map(r=>`<tr>
-          <td>${r.p.icon} ${esc(r.p.handle)}</td><td>${esc(roleStr(r.p))}</td>
+          <td>${esc(r.p.icon)} ${esc(r.p.handle)}</td><td>${esc(roleStr(r.p))}</td>
           <td class="mono" style="font-size:11px">${fmtRank(r.p.rank)}</td>
           <td class="num">${r.games}</td>
           <td class="num">${r.kd!=null?r.kd.toFixed(2):'—'}</td>
@@ -1533,6 +1547,9 @@ $("#railScrim").onclick=closeNav;
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeNav();});
 window.addEventListener("resize",()=>{if(window.innerWidth>860)closeNav();});
 $("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b){state.view=b.dataset.v;render();closeNav();}});
+/* delegated (survives M.innerHTML swaps) — replaces inline on* handlers for CSP */
+M.addEventListener("click",e=>{const em=e.target.closest("[data-editmonth]");if(em)editMonth(em.dataset.editmonth);});
+M.addEventListener("change",e=>{const gt=e.target.closest("[data-goaltoggle]");if(gt){const p=gt.dataset.goaltoggle.split("|");toggleMonthGoal(p[0],+p[1]);}});
 $("#wkPrev").onclick=()=>{state.week=addDays(state.week,-7);render();};
 $("#wkNext").onclick=()=>{state.week=addDays(state.week,7);render();};
 $("#tourPill").onclick=()=>{
@@ -1648,7 +1665,7 @@ async function renderAuth(){
 async function renderJoin(code){
   let iv;
   try{ iv=await API.get(`/api/invites/${encodeURIComponent(code)}`); }
-  catch(e){ showGate(`<p class="gatelede">${esc(e.message[0].toUpperCase()+e.message.slice(1))}.</p><button class="btn ghost" style="width:100%;justify-content:center" onclick="clearJoinHash();boot()">Back to sign in</button>`); return; }
+  catch(e){ showGate(`<p class="gatelede">${esc(e.message[0].toUpperCase()+e.message.slice(1))}.</p><button class="btn ghost" id="gateBack" style="width:100%;justify-content:center">Back to sign in</button>`); $("#gateBack").onclick=()=>{clearJoinHash();boot();}; return; }
   // already signed in? offer one-click join
   try{ ME=await API.get("/api/me"); }catch(e){ ME=null; }
   if(ME){
@@ -1699,7 +1716,8 @@ function renderNoTeam(){
     <button class="btn" id="mkTeam" style="width:100%;justify-content:center">Create a team</button>
     <div style="margin:14px 0 6px;text-align:center;color:var(--ink-3);font-size:11px;letter-spacing:.1em">OR REDEEM AN INVITE CODE</div>
     ${gateForm([{label:"Invite code",name:"code",required:true}],"Join with code",null)}
-    <button class="btn ghost" style="width:100%;justify-content:center;margin-top:10px" onclick="(async()=>{await API.post('/api/auth/logout');location.reload();})()">Sign out</button>`);
+    <button class="btn ghost" id="gateSignout" style="width:100%;justify-content:center;margin-top:10px">Sign out</button>`);
+  $("#gateSignout").onclick=async()=>{ await API.post('/api/auth/logout'); location.reload(); };
   $("#mkTeam").onclick=()=>{ $("#app").hidden=false; GATE.hidden=true; newTeamDialog(); };
   bindGateForm(async d=>{ const r=await API.post("/api/teams/join",{code:d.code.trim()}); ME=await API.get("/api/me"); await loadTeam(r.teamId); render(); });
 }

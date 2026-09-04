@@ -168,12 +168,19 @@ legacy/           v1 single-file app, and the shelved Overwolf importer
 
 ## Scrim import (`agent/`)
 
-The IGL runs `agent/sightline-agent.mjs` — a zero-dependency Node script that
-reads Valorant's **local client API** (`127.0.0.1` lockfile → entitlement token →
-`core-game` / `match-details`). No Riot password, no Overwolf, no Riot developer
-approval. When a custom game ends it `POST`s the scoreboard to
-`/api/import/match` with a per-team **ingest key** (Scrims → Scrim importer →
-generate). See `agent/README.md`.
+`agent/sightline-agent.mjs` — a zero-dependency Node script that reads Valorant's
+**local client API** (`127.0.0.1` lockfile → entitlement token → `core-game` /
+`match-details`). No Riot password, no Overwolf, no Riot developer approval. When
+a custom game ends it `POST`s the scoreboard to `/api/import/match`. See
+`agent/README.md`.
+
+Two auth modes:
+- **Desktop app** (any team member) — the agent rides your **logged-in session**
+  (`sid` cookie + `?team=<id>`). Nothing to paste; no shared secret ever reaches
+  a player's machine. Scrims → **Run scrim agent** → Start.
+- **Standalone / headless** — a per-team **ingest key** (`Bearer sk_…`), managed
+  by a manager under Scrims → Scrim importer. For running the agent on a box
+  that isn't signed in.
 
 - **Not every custom is a scrim.** A game is only imported when at least
   `import_min` (default 3) players whose in-game name starts with the team's
@@ -197,8 +204,26 @@ Installers are built by CI on a `desktop-v*` tag and attached to a GitHub
 Release. `cd desktop && npm start` to run it against the live site. See
 `desktop/README.md`.
 
+## Security
+
+- **Auth** — cookie sessions (256-bit token, stored as `sha256(token)`),
+  `HttpOnly` + `SameSite=Lax` + `Secure` (prod). PBKDF2 (100k) password hashing;
+  the login route spends the same PBKDF2 time on unknown emails (no timing
+  oracle).
+- **Rate limits** (D1 fixed-window, `rate_limits` table): login (40/10min per IP,
+  10/15min per email — cleared on a correct password), bootstrap, invite lookup +
+  accept, and `/api/import/match` (120/10min per team).
+- **CSP** — `public/_headers` ships `script-src 'self'` (no `unsafe-inline`), so
+  stored markup can't execute; plus `X-Frame-Options`, `nosniff`, HSTS,
+  `Referrer-Policy`. The Worker adds the same headers to `/api/*` responses.
+- **Input** — every stored free-text field is length-capped and control-char
+  stripped server-side; `handle`/`icon`/team name also drop `<>`. Enums (server,
+  region, status, role) are allow-listed.
+- **Tenancy** — a `player`-role account belongs to exactly one team (staff may be
+  multi-team). Every `/api/teams/:id/*` route is guarded by team membership + a
+  minimum role; sub-resource writes are always scoped `WHERE team_id = ?`.
+
 ## Roadmap
 
 - Email delivery for invites and a password-reset flow.
-- Rate-limiting on auth + import endpoints.
 - Code-sign the desktop installers (Windows SmartScreen / Linux).

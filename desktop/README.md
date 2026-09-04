@@ -26,13 +26,16 @@ page:
 
 Both go away with a code-signing certificate — see the repo README roadmap.
 
-Sign in as usual. On Windows, **Scrims → Scrim importer** has a *"Run the
-agent on this PC"* section:
+Sign in as usual. On Windows, **Scrims → Run scrim agent** (any team member) has:
 
-- paste your ingest key once (saved to the OS user-data folder, not the bundle)
 - **Start / Stop** toggle — the agent is **off** until you start it
 - optional *"Start automatically when this app opens"*
 - a live **log** that survives closing/reopening the dialog (Clear to wipe it)
+
+No ingest key to paste — the agent imports **as you**, using your Sightline
+login (the main process reads the `sid` cookie from the signed-in window and
+passes it to the agent along with the active team id). Nothing secret lands on
+the machine.
 
 Leave the window open while you scrim. More than one teammate can run it — the
 server de-dupes on match id, so nothing imports twice.
@@ -60,9 +63,12 @@ SIGHTLINE_SITE=http://localhost:8787 npm start
 
 `main.js` spawns `agent/sightline-agent.mjs` as a child process using Electron's
 **bundled Node** (`process.execPath` + `ELECTRON_RUN_AS_NODE=1`), so the user
-needs nothing installed. Config is passed by environment
-(`SIGHTLINE_URL`, `SIGHTLINE_INGEST_KEY`, `SIGHTLINE_POLL_SECONDS`,
-`SIGHTLINE_STATE`) — the agent falls back to these when there's no `config.json`.
+needs nothing installed. Config is passed by environment: `SIGHTLINE_URL`,
+`SIGHTLINE_POLL_SECONDS`, `SIGHTLINE_STATE`, and for auth either
+`SIGHTLINE_SESSION` + `SIGHTLINE_TEAM` (the `sid` cookie read from the signed-in
+window + the active team id — the default) or `SIGHTLINE_INGEST_KEY` (only if a
+key was explicitly saved). The agent falls back to these when there's no
+`config.json`.
 The agent script is bundled via electron-builder `extraResources`, so a game
 patch that needs an `agent/` fix ships in the next desktop release (or the user
 runs the standalone `agent/` folder in the meantime).
