@@ -9,9 +9,13 @@ companion app.
 - `src/auth.js` — PBKDF2 password hashing, sessions, cookies
 - `src/valorant.js` — HenrikDev lookups (server-side): `fetchRank` (current
   tier/RR via v3/mmr) + `fetchMmrHistory` (per-match ranked history via
-  v2/stored-mmr-history — one call, `size` only; that endpoint has no `page`).
-  `hdFetch()` retries once on 429 (Basic key = 30 req/min). `despikeHistory()`
-  drops HenrikDev glitch rows (isolated elo spikes, sub-Iron-1, no elo).
+  v2/stored-mmr-history — one call, `size` only; no `page`). `stored-mmr-history`
+  is HenrikDev's own backfilled log and can be empty for an account they haven't
+  tracked yet even with a valid rank, so an empty result falls back to the live
+  v2/mmr-history pull (last ~20 games straight from Riot, `source:"live"` on the
+  return). `hdFetch()` retries on 429, honouring Retry-After up to a 60s cap
+  (Basic key = 30 req/min). `despikeHistory()` drops HenrikDev glitch rows
+  (isolated elo spikes, sub-Iron-1, no elo).
 - `src/seed.js` — sample data for new teams
 - `public/` — frontend: `index.html`, `app.js` (all views), `app.css`, `api.js`
 - `migrations/` — D1 schema, applied in order

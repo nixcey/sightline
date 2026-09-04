@@ -105,8 +105,12 @@ button does two things per rostered player:
    even for accounts HenrikDev has never seen).
 2. **match history** — `/valorant/v2/stored-mmr-history` → every stored ranked
    game into `rank_history`, deduped on `match_id` so re-running only adds new
-   games. HenrikDev only stores games played *after* an account is first queried
-   through their API, so the first sync of a fresh account may be short.
+   games. That endpoint is HenrikDev's own backfilled log, not a live Riot pull —
+   it can come back empty for an account they haven't tracked yet even though
+   the account has a rank, so an empty result falls back to the live (non-stored)
+   `/valorant/v2/mmr-history` — the last ~20 games straight from Riot, no
+   backfill delay. 429s from HenrikDev's rate limit are retried automatically
+   (honouring `Retry-After`, capped at 60s).
 
 **Rank Tracking** tab: a team-average elo trajectory plus a per-player view
 (elo-per-game chart, W–L from RR deltas, peak, recent games). Manual tier entry

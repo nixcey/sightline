@@ -106,6 +106,43 @@ try {
   fail("rank history: " + (e.stack || e.message));
 }
 
+/* ---------- 5. fetchMmrHistory falls back to live mmr-history when stored is empty ---------- */
+console.log("mmr history fallback");
+{
+  const realFetch = globalThis.fetch;
+  try {
+    const val = await import("../src/valorant.js");
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      if (u.includes("/stored-mmr-history/")) {
+        return { ok: true, status: 200, headers: new Map(), json: async () => ({ status: 200, results: { total: 0 }, data: [] }) };
+      }
+      if (u.includes("/mmr-history/")) {
+        return {
+          ok: true, status: 200, headers: new Map(),
+          json: async () => ({
+            status: 200,
+            data: [
+              { match_id: "live1", tier: { id: 22, name: "Ascendant 2" }, rr: 40, last_change: 10, elo: 1940, date: "2026-09-04T00:00:00Z", map: { name: "Ascent" }, season: { short: "e11a5" } },
+              { match_id: "live2", tier: { id: 22, name: "Ascendant 2" }, rr: 30, last_change: -10, elo: 1930, date: "2026-09-04T01:00:00Z", map: { name: "Bind" }, season: { short: "e11a5" } },
+            ],
+          }),
+        };
+      }
+      throw new Error("unexpected fetch: " + u);
+    };
+    const r = await val.fetchMmrHistory({ name: "X", tag: "y" }, "eu", "key");
+    if (r.source !== "live") throw new Error(`expected source "live", got "${r.source}"`);
+    if (r.entries.length !== 2) throw new Error(`expected 2 entries from the live fallback, got ${r.entries.length}`);
+    if (r.entries[0].matchId !== "live1" || r.entries[0].map !== "Ascent") throw new Error("live row parsed wrong");
+    ok("empty stored-mmr-history falls back to live mmr-history");
+  } catch (e) {
+    fail("mmr history fallback: " + (e.stack || e.message));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
 console.log(failures ? `\n${failures} check(s) failed` : "\nall checks passed");
 process.exit(failures ? 1 : 0);
 

@@ -19,8 +19,9 @@ export function parseRankName(s, rr) {
   return tier ? { tier, div: +m[2], rr: rr || 0 } : null;
 }
 
-// GET against HenrikDev with one automatic retry on 429 (their Basic key is only
-// 30 req/min, and a full team sync bursts past that). Honours Retry-After.
+// GET against HenrikDev with automatic retries on 429 (their Basic key is only
+// 30 req/min, and a full team sync bursts past that). Honours Retry-After, but
+// never waits more than a minute for one attempt — a full sync stays bounded.
 async function hdFetch(url, key, tries = 3) {
   for (let i = 0; ; i++) {
     let res;
@@ -30,8 +31,8 @@ async function hdFetch(url, key, tries = 3) {
       throw new Error("could not reach rank API");
     }
     if (res.status === 429 && i < tries - 1) {
-      const ra = Number(res.headers.get("retry-after")) || Number(res.headers.get("x-ratelimit-reset")) || 3;
-      await new Promise((r) => setTimeout(r, Math.min(Math.max(ra, 1), 12) * 1000));
+      const ra = Number(res.headers.get("retry-after")) || Number(res.headers.get("x-ratelimit-reset")) || 5;
+      await new Promise((r) => setTimeout(r, Math.min(Math.max(ra, 1), 60) * 1000));
       continue;
     }
     if (res.status === 404) throw new Error("Riot ID not found (renamed? wrong region?)");
@@ -69,37 +70,65 @@ export function despikeHistory(entries) {
   return { entries: keep, dropped };
 }
 
-// Per-match competitive history from HenrikDev's stored-mmr-history.
-// Only contains games played *after* the account was first queried through their
-// API, so it can be empty/short for accounts they've never seen. The v2 endpoint
-// takes only `size` (cursor pagination, not page numbers), so one call is enough.
-export async function fetchMmrHistory({ name, tag }, region, key, { size = 100 } = {}) {
-  const url = `https://api.henrikdev.xyz/valorant/v2/stored-mmr-history/${region}/pc/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?size=${size}`;
-  const res = await hdFetch(url, key);
-  const j = await res.json().catch(() => null);
-  const rows = (j && j.data) || [];
-  const total = (j && j.results && j.results.total) || rows.length;
+// One HenrikDev history row (stored or live shape) -> our shape, or null if it
+// has no match id. Field names differ a little between the two endpoints
+// (rr/ranking_in_tier, last_change/mmr_change_to_last_game) — cover both.
+function normHistoryRow(e) {
+  const mid = e && e.match_id;
+  if (!mid) return null;
+  const tierId = (e.tier && e.tier.id) ?? e.currenttier ?? 0;
+  const rr = e.rr ?? e.ranking_in_tier ?? 0;
+  return {
+    matchId: mid,
+    playedAt: e.date || e.date_raw || "",
+    tierId,
+    tierName: (e.tier && e.tier.name) || e.currenttierpatched || "",
+    rr,
+    lastChange: e.last_change ?? e.mmr_change_to_last_game ?? 0,
+    elo: e.elo ?? (tierId >= 3 ? (tierId - 3) * 100 + rr : 0),
+    map: (e.map && e.map.name) || "",
+    season: (e.season && e.season.short) || "",
+  };
+}
+function dedupeRows(rows) {
   const seen = new Set();
-  const raw = [];
+  const out = [];
   for (const e of rows) {
-    const mid = e.match_id;
-    if (!mid || seen.has(mid)) continue;
-    seen.add(mid);
-    const tierId = (e.tier && e.tier.id) || 0;
-    raw.push({
-      matchId: mid,
-      playedAt: e.date || e.date_raw || "",
-      tierId,
-      tierName: (e.tier && e.tier.name) || "",
-      rr: e.rr ?? e.ranking_in_tier ?? 0,
-      lastChange: e.last_change ?? e.mmr_change_to_last_game ?? 0,
-      elo: e.elo ?? (tierId >= 3 ? (tierId - 3) * 100 + (e.rr ?? 0) : 0),
-      map: (e.map && e.map.name) || "",
-      season: (e.season && e.season.short) || "",
-    });
+    if (!e || seen.has(e.matchId)) continue;
+    seen.add(e.matchId);
+    out.push(e);
   }
+  return out;
+}
+
+// Per-match competitive history. HenrikDev's stored-mmr-history is their own
+// backfilled log — it only has games for an account once something has asked
+// HenrikDev about it before, so it can be empty for a fresh Riot ID even though
+// the account has plenty of ranked games. When that comes back empty, fall back
+// to the live (non-stored) mmr-history pull, which hits Riot directly and
+// always has the last ~20 ranked games with no backfill delay.
+export async function fetchMmrHistory({ name, tag }, region, key, { size = 100 } = {}) {
+  const enc = `${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+  const storedUrl = `https://api.henrikdev.xyz/valorant/v2/stored-mmr-history/${region}/pc/${enc}?size=${size}`;
+  const res = await hdFetch(storedUrl, key);
+  const j = await res.json().catch(() => null);
+  const storedRows = (j && j.data) || [];
+  let raw = dedupeRows(storedRows.map(normHistoryRow));
+  let total = (j && j.results && j.results.total) || raw.length;
+  let source = "stored";
+
+  if (!raw.length) {
+    const liveUrl = `https://api.henrikdev.xyz/valorant/v2/mmr-history/${region}/pc/${enc}`;
+    const lres = await hdFetch(liveUrl, key);
+    const lj = await lres.json().catch(() => null);
+    const liveRows = Array.isArray(lj && lj.data) ? lj.data : Array.isArray(lj && lj.data && lj.data.history) ? lj.data.history : [];
+    raw = dedupeRows(liveRows.map(normHistoryRow));
+    total = raw.length;
+    source = "live";
+  }
+
   const clean = despikeHistory(raw);
-  return { total, entries: clean.entries, dropped: clean.dropped };
+  return { total, entries: clean.entries, dropped: clean.dropped, source };
 }
 
 export async function fetchRank({ name, tag }, region, key) {

@@ -863,6 +863,7 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
       pr.total = hist.total;
       pr.dropped = hist.dropped || 0;
       dropped += pr.dropped;
+      if (hist.source === "live" && !pr.err) pr.err = "no stored history yet — showing the last ~20 live games";
       if (hist.entries.length) {
         const have = await c.env.DB
           .prepare("SELECT match_id FROM rank_history WHERE team_id = ? AND player_id = ?")
