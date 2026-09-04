@@ -1,7 +1,7 @@
 {
   "name": "sightline-desktop",
   "productName": "Sightline",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "private": true,
   "description": "Desktop wrapper for Sightline. On Windows it can run the scrim agent for you.",
   "author": "Sightline <notnixcey@gmail.com>",
@@ -21,17 +21,30 @@
   "build": {
     "appId": "gg.sightline.desktop",
     "productName": "Sightline",
-    "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
     "extraResources": [
       {
         "from": "../agent",
         "to": "agent",
-        "filter": ["**/*.mjs", "package.json", "!config.json", "!state.json"]
+        "filter": [
+          "**/*.mjs",
+          "package.json",
+          "!config.json",
+          "!state.json"
+        ]
       }
     ],
     "win": {
-      "target": ["nsis", "zip"],
+      "target": [
+        "nsis",
+        "zip"
+      ],
       "icon": "icon.png",
       "artifactName": "Sightline-${version}-${arch}.${ext}"
     },
@@ -44,7 +57,10 @@
       "artifactName": "Sightline-Setup-${version}.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "icon.png",
       "category": "Utility",
       "maintainer": "Sightline <notnixcey@gmail.com>",

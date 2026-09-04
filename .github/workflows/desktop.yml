@@ -62,13 +62,17 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      - name: release version
+        id: ver
+        shell: bash
+        run: echo "v=${GITHUB_REF_NAME#desktop-}" >> "$GITHUB_OUTPUT"   # desktop-v1.0.2 -> v1.0.2
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
           draft: false
           make_latest: false
           generate_release_notes: true
-          name: Sightline Desktop ${{ github.ref_name }}
+          name: Sightline Desktop ${{ steps.ver.outputs.v }}
           body: |
             Desktop build of Sightline (Windows + Linux). **Unsigned** — see below.
 
@@ -90,5 +94,6 @@ jobs:
             `Sightline-*.AppImage` (mark executable, double-click) or `Sightline-*.deb`.
 
             ### Using it
-            Sign in as normal. On Windows, **Scrims → Scrim importer** has a
-            Start/Stop panel that runs the scrim agent for you.
+            Sign in as normal. On Windows, **Scrims → Run scrim agent** has a
+            Start/Stop panel that runs the scrim agent for you — signed in as you,
+            no ingest key needed.
