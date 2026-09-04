@@ -81,6 +81,31 @@ try {
   fail("agent: " + (e.stack || e.message));
 }
 
+/* ---------- 4. rank-history despike ---------- */
+console.log("rank history");
+try {
+  const { despikeHistory } = await import("../src/valorant.js");
+  const mk = (i, elo, tierId) => ({ matchId: "m" + i, playedAt: `2026-08-${String(i + 1).padStart(2, "0")}T00:00:00Z`, tierId, elo });
+  // steady Ascendant climb with one HenrikDev glitch row plunging to "Iron 3"
+  const raw = [
+    mk(0, 1810, 21), mk(1, 1825, 21), mk(2, 1840, 21),
+    mk(3, 205, 5),                       // <- the bogus dip
+    mk(4, 1852, 21), mk(5, 1868, 21), mk(6, 1880, 22),
+  ];
+  const { entries, dropped } = despikeHistory(raw);
+  if (dropped !== 1) throw new Error(`expected 1 dropped, got ${dropped}`);
+  if (entries.some((e) => e.matchId === "m3")) throw new Error("glitch row survived the despike");
+  if (entries.length !== 6) throw new Error(`expected 6 kept, got ${entries.length}`);
+  // a real climb of ~40/game must NOT be flagged
+  const legit = [mk(0, 1800, 21), mk(1, 1840, 21), mk(2, 1880, 21), mk(3, 1920, 22), mk(4, 1960, 22)];
+  if (despikeHistory(legit).dropped !== 0) throw new Error("a normal climb was wrongly despiked");
+  // rows below Iron 1 / with no elo are always dropped
+  if (despikeHistory([mk(0, 0, 0), mk(1, 1800, 21)]).entries.length !== 1) throw new Error("junk row not dropped");
+  ok("despike drops HenrikDev glitch rows, keeps real movement");
+} catch (e) {
+  fail("rank history: " + (e.stack || e.message));
+}
+
 console.log(failures ? `\n${failures} check(s) failed` : "\nall checks passed");
 process.exit(failures ? 1 : 0);
 
@@ -156,7 +181,8 @@ function rankHistoryFixture() {
     tierId, tierName: "x", rr, lastChange: chg, elo: (tierId - 3) * 100 + rr, map: "Ascent", season: "e11a5",
   });
   return [
-    mk("p1", 1, 24, 10, 20), mk("p1", 2, 24, 30, 20), mk("p1", 3, 24, 12, -18), mk("p1", 4, 25, 5, 21),
+    mk("p1", 1, 24, 10, 20), mk("p1", 2, 24, 30, 20), mk("p1", 3, 0, 0, 0), /* junk row the FE guard must hide */
+    mk("p1", 4, 24, 12, -18), mk("p1", 5, 25, 5, 21),
     mk("p2", 1, 23, 80, 15), mk("p2", 2, 24, 4, 19), mk("p2", 3, 24, 25, 21), mk("p2", 4, 24, 8, -17),
   ];
 }

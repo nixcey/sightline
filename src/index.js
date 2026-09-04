@@ -832,14 +832,21 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
     .map((r) => ({ id: r.id, handle: r.handle, riot: J(r.riot_id, null) }))
     .filter((x) => x.riot && x.riot.name && x.riot.tag);
   if (b.only) targets = targets.filter((x) => x.id === b.only);
-  if (!targets.length) return c.json({ done: 0, total: 0, fail: 0, added: 0, err: "no Riot IDs on the roster", players: [] });
+  if (!targets.length) return c.json({ done: 0, total: 0, fail: 0, unrated: 0, added: 0, dropped: 0, err: "no Riot IDs on the roster", players: [] });
+
+  // "Rebuild" — wipe the stored history first so a bad row that re-sync can't
+  // overwrite (INSERT OR IGNORE keys on match id) gets re-fetched cleanly.
+  if (b.rebuild) {
+    if (b.only) await c.env.DB.prepare("DELETE FROM rank_history WHERE team_id = ? AND player_id = ?").bind(id, b.only).run();
+    else await c.env.DB.prepare("DELETE FROM rank_history WHERE team_id = ?").bind(id).run();
+  }
 
   const stamp = now();
-  let done = 0, fail = 0, added = 0, err = "";
+  let done = 0, fail = 0, unrated = 0, added = 0, dropped = 0, err = "";
   const players = [];
   for (const x of targets) {
     const region = x.riot.region || val.regionFor(t.server);
-    const pr = { id: x.id, handle: x.handle, rank: null, added: 0, total: 0, err: "" };
+    const pr = { id: x.id, handle: x.handle, status: "ok", rank: null, added: 0, dropped: 0, total: 0, err: "" };
     // 1) authoritative current rank (works even when the stored history is empty)
     try {
       const r = await val.fetchRank(x.riot, region, key);
@@ -848,12 +855,14 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
           .bind(JSON.stringify(r), stamp, x.id).run();
         pr.rank = r;
         done++;
-      } else { pr.err = "unrated"; err = "unrated"; }
-    } catch (e) { pr.err = e.message; err = e.message; fail++; }
+      } else { pr.status = "unrated"; pr.err = "unrated / in placements"; unrated++; }
+    } catch (e) { pr.status = "error"; pr.err = e.message; err = e.message; fail++; }
     // 2) backfill match-by-match history (only rows we don't have yet)
     try {
       const hist = await val.fetchMmrHistory(x.riot, region, key);
       pr.total = hist.total;
+      pr.dropped = hist.dropped || 0;
+      dropped += pr.dropped;
       if (hist.entries.length) {
         const have = await c.env.DB
           .prepare("SELECT match_id FROM rank_history WHERE team_id = ? AND player_id = ?")
@@ -870,11 +879,24 @@ app.post("/api/teams/:id/sync-ranks", team("igl"), async (c) => {
         pr.added = fresh.length;
         added += fresh.length;
       }
-    } catch (e) { if (!pr.err) { pr.err = e.message; err = e.message; } }
+    } catch (e) {
+      if (pr.status !== "error") { pr.status = "error"; fail++; }
+      pr.err = pr.err ? `${pr.err}; history: ${e.message}` : `history: ${e.message}`;
+      err = e.message;
+    }
     players.push(pr);
-    await new Promise((res) => setTimeout(res, 360));
+    await new Promise((res) => setTimeout(res, 400));
   }
-  return c.json({ done, total: targets.length, fail, added, err, players });
+  return c.json({ done, total: targets.length, fail, unrated, added, dropped, err, players });
+});
+
+// Remove a single glitched history row (e.g. a HenrikDev spike that predates the
+// despike filter). Admins only.
+app.delete("/api/teams/:id/rank-history/:pid/:mid", team("igl"), async (c) => {
+  const { id, pid, mid } = c.req.param();
+  await c.env.DB.prepare("DELETE FROM rank_history WHERE team_id = ? AND player_id = ? AND match_id = ?")
+    .bind(id, pid, decodeURIComponent(mid)).run();
+  return c.json({ ok: true });
 });
 
 // ================================================================ tryouts

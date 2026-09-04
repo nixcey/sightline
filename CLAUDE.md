@@ -9,7 +9,9 @@ companion app.
 - `src/auth.js` — PBKDF2 password hashing, sessions, cookies
 - `src/valorant.js` — HenrikDev lookups (server-side): `fetchRank` (current
   tier/RR via v3/mmr) + `fetchMmrHistory` (per-match ranked history via
-  v2/stored-mmr-history, paginated)
+  v2/stored-mmr-history — one call, `size` only; that endpoint has no `page`).
+  `hdFetch()` retries once on 429 (Basic key = 30 req/min). `despikeHistory()`
+  drops HenrikDev glitch rows (isolated elo spikes, sub-Iron-1, no elo).
 - `src/seed.js` — sample data for new teams
 - `public/` — frontend: `index.html`, `app.js` (all views), `app.css`, `api.js`
 - `migrations/` — D1 schema, applied in order
@@ -58,11 +60,18 @@ companion app.
   + `SIGHTLINE_TEAM` (desktop passes the `sid` cookie) or `SIGHTLINE_INGEST_KEY`.
 - **Rank tracking:** `POST /api/teams/:id/sync-ranks` refreshes each rostered
   player's `players.rank` *and* backfills `rank_history` (one row per ranked
-  match, PK `(team_id, player_id, match_id)` → incremental). The Rank Tracking
-  tab lazy-loads `GET /api/teams/:id/rank-history` into `state.rankHist` (not the
-  bundle — it can grow large); `syncRanks()` nulls that cache. `tierRank(id,rr)`
-  maps a HenrikDev tier id to the app's `{tier,div,rr}` (RR is `%100` for
-  Immortal+). The old manual `rank_snapshots` feature is gone (dropped in 0007).
+  match, PK `(team_id, player_id, match_id)` → incremental, `INSERT OR IGNORE`).
+  Because of that PK a bad stored row never gets overwritten — pass `{rebuild:1}`
+  (whole team) or `{only,rebuild:1}` to wipe + re-pull, or
+  `DELETE /rank-history/:pid/:mid` to drop one row. The response's `players[]`
+  carries a per-player `status` (`ok`/`unrated`/`error`) + `err` + `dropped`;
+  the Rank tab renders it as a "Last sync result" panel (`state.rankSync`) so
+  failures aren't just a toast. The tab lazy-loads
+  `GET /api/teams/:id/rank-history` into `state.rankHist` (not the bundle — it
+  can grow large); `syncRanks()` nulls that cache and also filters
+  `tierId>=3 && elo>0` client-side as a backstop. `tierRank(id,rr)` maps a
+  HenrikDev tier id to the app's `{tier,div,rr}` (RR is `%100` for Immortal+).
+  The old manual `rank_snapshots` feature is gone (dropped in 0007).
 - **Matches:** `scrims` rows carry `kind` (`'scrim'` | `'official'`) + a `vods`
   JSON array. `matchesOf(kind)` in `app.js` filters the bundle; the Scrims and
   Officials tabs are one `matchListView(kind)`. Officials never count toward the

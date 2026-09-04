@@ -83,16 +83,23 @@ function parseRankName(s,rr){
 
 /* Rank sync runs on the server (POST /sync-ranks) — it holds the HenrikDev key
    in the team row and calls the API from the edge. */
-async function syncRanks(only){
+async function syncRanks(only,opts){
+  opts=opts||{};
   if(state.syncing)return;
   if(!canEdit())return;
-  state.syncing=true;render();
+  if(opts.rebuild&&!confirm(only?`Rebuild ${only.handle}'s rank history from scratch? Drops the stored rows and re-pulls a clean copy from HenrikDev.`:"Rebuild the whole team's rank history from scratch?"))return;
+  state.syncing=true;state.rankSync=null;render();
   try{
-    const r=await API.post(`/api/teams/${TID()}/sync-ranks`, only?{only:only.id}:{});
-    state.rankHist=null;                 // force a re-fetch of the history
+    const r=await API.post(`/api/teams/${TID()}/sync-ranks`, {...(only?{only:only.id}:{}),...(opts.rebuild?{rebuild:true}:{})});
+    state.rankHist=null;   // force a re-fetch of the history
+    state.rankSync=r;      // keep the per-player result on screen until dismissed
     await reload();
-    const nAdd=r.added||0;
-    toast(`Rank sync: ${r.done}/${r.total} live`+(nAdd?` · +${nAdd} game${nAdd===1?"":"s"}`:"")+(r.fail?` · ${r.fail} failed (${r.err})`:""));
+    const bits=[`${r.done}/${r.total} live`];
+    if(r.added)bits.push(`+${r.added} game${r.added===1?"":"s"}`);
+    if(r.dropped)bits.push(`${r.dropped} bad row${r.dropped===1?"":"s"} dropped`);
+    if(r.unrated)bits.push(`${r.unrated} unrated`);
+    if(r.fail)bits.push(`${r.fail} failed`);
+    toast("Rank sync: "+bits.join(" · "));
   }catch(e){
     toast(e.message||"Sync failed");
   }finally{
@@ -141,7 +148,7 @@ async function act(promise,okMsg){
 /* ============================================================ ui state */
 const MFILTER_DEF={map:"",opp:"",result:"",margin:"",player:"",agent:"",comp:[],since:""};
 let state={view:"overview",week:mondayOf(new Date()),perfWindow:5,complabMap:"Ascent",tryoutSort:"score",syncing:false,
-  mfilter:{...MFILTER_DEF,comp:[]},mfilterOpen:false,rankView:"team",rankHist:null};
+  mfilter:{...MFILTER_DEF,comp:[]},mfilterOpen:false,rankView:"team",rankHist:null,rankSync:null};
 
 const NAV=[
   ["overview","Overview",icon("grid")],
@@ -708,7 +715,9 @@ VIEWS_ranks=()=>{
       .catch(e=>{state.rankHist=[];toast(e.message||"Couldn't load rank history");render();});
     return;
   }
-  const hist=state.rankHist;
+  // guard against pre-existing glitch rows (below Iron 1 / no elo) that predate
+  // the server-side despike — a "Rebuild history" clears them for good.
+  const hist=(state.rankHist||[]).filter(e=>e.tierId>=3&&e.elo>0);
   const roster=team().roster.filter(p=>p.status!=="Inactive");
   const byPlayer={};roster.forEach(p=>byPlayer[p.id]=[]);
   hist.forEach(e=>{if(byPlayer[e.playerId])byPlayer[e.playerId].push(e);});
@@ -734,14 +743,43 @@ VIEWS_ranks=()=>{
   M.innerHTML=`<div class="grid">
     <div class="btn-row" style="flex-wrap:wrap;gap:8px">
       ${canEdit()?`<button class="btn" id="rkSync" ${state.syncing?'disabled':''}>${state.syncing?'Syncing…':'⟳ Sync rank history'}</button>`:''}
+      ${canEdit()&&hist.length?`<button class="btn ghost" id="rkRebuild" ${state.syncing?'disabled':''}>Rebuild from scratch</button>`:''}
       <span class="chip">Team rank now · ${fmtRank(live)}</span>
     </div>
+    ${rankSyncPanel()}
     ${seg}
     ${bodyHTML}
   </div>`;
   const sy=$("#rkSync");if(sy)sy.onclick=()=>syncRanks();
+  const rb=$("#rkRebuild");if(rb)rb.onclick=()=>syncRanks(null,{rebuild:true});
+  const dz=$("#rkSyncX");if(dz)dz.onclick=()=>{state.rankSync=null;render();};
   M.querySelectorAll("[data-rv]").forEach(b=>b.onclick=()=>{state.rankView=b.dataset.rv;render();});
+  M.querySelectorAll("[data-drophist]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Drop this ranked game from the history?"))return;
+    try{ await API.del(`/api/teams/${TID()}/rank-history/${b.dataset.pid}/${encodeURIComponent(b.dataset.drophist)}`);
+      state.rankHist=null; toast("Game dropped"); render(); }
+    catch(e){ toast(e.message); }
+  });
 };
+function rankSyncPanel(){
+  const r=state.rankSync;if(!r||!r.players||!r.players.length)return "";
+  const ico={ok:'<span class="chip good">✓</span>',unrated:'<span class="chip warn">unrated</span>',error:'<span class="chip crit">✕</span>'};
+  return `<div class="panel">
+    <div class="panel-h"><h3>Last sync result</h3>
+      <button class="icar" id="rkSyncX" title="Dismiss">✕</button></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Player</th><th>Status</th><th>Rank</th><th class="num">+games</th><th class="num">dropped</th><th>Notes</th></tr></thead>
+      <tbody>${r.players.map(p=>`<tr>
+        <td>${esc(p.handle)}</td>
+        <td>${ico[p.status]||p.status}</td>
+        <td>${p.rank?esc(rankStr(p.rank)):'—'}</td>
+        <td class="num">${p.added||0}</td>
+        <td class="num ${p.dropped?'down':''}">${p.dropped||0}</td>
+        <td class="sub">${esc(p.err||'')}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+  </div>`;
+}
 function downsample(arr,n){
   if(arr.length<=n)return arr;
   const out=[],step=(arr.length-1)/(n-1);
@@ -862,15 +900,16 @@ function rankPlayerView(p,a){
       <div class="hint" style="margin-top:6px">${a.length} games · ${s.dir>0?`W${s.streak} streak`:s.dir<0?`L${s.streak} streak`:'—'} · since ${dstr(first.playedAt)}</div>
     </div>
     <div class="panel">
-      <div class="panel-h"><h3>Recent games</h3><span class="hint">latest 25</span></div>
+      <div class="panel-h"><h3>Recent games</h3><span class="hint">latest 25${canEdit()?' · drop a wrong row with ✕':''}</span></div>
       <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Date</th><th>Map</th><th>Rank</th><th class="num">RR</th><th class="num">Δ</th></tr></thead>
+        <thead><tr><th>Date</th><th>Map</th><th>Rank</th><th class="num">RR</th><th class="num">Δ</th>${canEdit()?'<th></th>':''}</tr></thead>
         <tbody>${a.slice(-25).reverse().map(e=>`<tr>
           <td class="mono">${dstr(e.playedAt)}</td>
           <td>${esc(e.map||'—')}</td>
           <td>${rankShort(tierRank(e.tierId,e.rr))}</td>
           <td class="num">${tierRank(e.tierId,e.rr).rr}</td>
           <td class="num ${e.lastChange>0?'up':e.lastChange<0?'down':'flat'}">${e.lastChange>0?'+':''}${e.lastChange}</td>
+          ${canEdit()?`<td><button class="icar" data-drophist="${esc(e.matchId)}" data-pid="${esc(p.id)}" title="Drop this game">✕</button></td>`:''}
         </tr>`).join("")}</tbody>
       </table></div>
     </div>`;
