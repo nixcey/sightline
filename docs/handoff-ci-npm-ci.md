@@ -2,6 +2,11 @@
 
 Written on the Windows box, to pick up on Linux (`~/xpe-proj`).
 
+> **Resolved 2026-09-04** — the `deploy.yml` change below is applied: `check`
+> runs `node scripts/check.mjs` with no install, `deploy` caches `node_modules`
+> keyed on `package-lock.json`. The analysis + Windows-box quirks are kept below
+> for reference.
+
 ## Where things stand
 
 - **Rank-sync fixes are done, committed, and pushed** as `98148c6`

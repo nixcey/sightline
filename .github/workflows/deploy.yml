@@ -23,10 +23,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      # scripts/check.mjs imports only node builtins + the zero-dep
+      # agent/sightline-agent.mjs and src/valorant.js. No hono, no wrangler ->
+      # no `npm ci` needed. If a future check imports src/index.js (hono) or any
+      # dependency, add back an install step here.
       - name: Checks (syntax, view render, parser)
-        run: npm run check
+        run: node scripts/check.mjs
 
   deploy:
     # only on a real push to main — never on pull_request, so forked PRs
@@ -40,8 +42,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      - name: Cache node_modules
+        id: nm
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.nm.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund --prefer-offline
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply sightline --remote
         env:
