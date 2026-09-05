@@ -50,9 +50,10 @@ companion app.
   Account.
   Colours come **only** from the token block at the top of `app.css` — light
   on `:root`, dark redefined under both `prefers-color-scheme` and
-  `[data-theme="dark"]` so the in-app toggle wins either way. `--serif`
-  (IBM Plex Serif) is headings + big numbers, `--sans`/`--disp` is UI,
-  `--mono` numerics, `--brand` (Chakra Petch) the SIGHTLINE mark only.
+  `[data-theme="dark"]` so the in-app toggle wins either way. One sans family
+  end to end — `--sans`/`--disp` (Inter) is headings *and* UI, no serif split
+  — `--mono` (Roboto Mono) numerics, `--brand` (Chakra Petch) the SIGHTLINE
+  mark only.
   `[hidden]{display:none!important}` near the top is load-bearing: several
   shell elements are toggled by the attribute against author `display` rules
   that would otherwise win on equal specificity.

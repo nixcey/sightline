@@ -399,7 +399,7 @@ VIEWS_overview=()=>{
         <div class="panel-h"><h3>Next up</h3></div>
         <div class="panel-b">
           ${nextAct?`<div class="eyebrow">${nextAct.d}</div>
-            <div style="font-family:var(--serif);font-size:20px">${esc(nextAct.title)}</div>
+            <div style="font-family:var(--sans);font-weight:600;font-size:20px">${esc(nextAct.title)}</div>
             <div class="sub">${nextAct.time} · ${esc(nextAct.type)}</div>`:
             `<div class="sub">No activities planned this week.</div>`}
           <div style="margin-top:12px"><button class="btn ghost sm" data-go="activities">Plan week →</button></div>
@@ -860,9 +860,9 @@ function mmrChart(lines){
   const df=t=>{const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate();};
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
     ${grid.map(u=>`<line x1="${padL}" x2="${w-padR}" y1="${Y(u).toFixed(1)}" y2="${Y(u).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
-      <text x="3" y="${(Y(u)+3).toFixed(1)}" font-size="9" fill="var(--ink-4)" font-family="'IBM Plex Sans',sans-serif">${rankShort(unitsToRank(u))}</text>`).join("")}
-    <text x="${padL}" y="${h-5}" font-size="8" fill="var(--ink-3)" font-family="'IBM Plex Mono',monospace">${df(t0)}</text>
-    <text x="${w-padR}" y="${h-5}" font-size="8" fill="var(--ink-3)" text-anchor="end" font-family="'IBM Plex Mono',monospace">${df(t1)}</text>
+      <text x="3" y="${(Y(u)+3).toFixed(1)}" font-size="9" fill="var(--ink-4)" font-family="var(--sans)">${rankShort(unitsToRank(u))}</text>`).join("")}
+    <text x="${padL}" y="${h-5}" font-size="8" fill="var(--ink-3)" font-family="var(--mono)">${df(t0)}</text>
+    <text x="${w-padR}" y="${h-5}" font-size="8" fill="var(--ink-3)" text-anchor="end" font-family="var(--mono)">${df(t1)}</text>
     ${lines.map(l=>{
       const pl=l.pts.slice().sort((a,b)=>a.t-b.t);
       const d=pl.map((p,i)=>`${i?'L':'M'}${X(p.t).toFixed(1)},${Y(eloUnits(p.y)).toFixed(1)}`).join(" ");
