@@ -55,18 +55,48 @@ export async function seedTeam(db, teamId) {
   S("2026-08-29", "Kestrel", "Sunset", 10, 13, [["nix", "Chamber", 13, 16, 5], ["Sable", "Jett", 20, 17, 3], ["Koda", "Omen", 8, 17, 6], ["Riven", "Sova", 13, 15, 9], ["Tython", "KAY/O", 12, 16, 7]]);
   S("2026-09-02", "Vantage", "Split", 13, 9, [["nix", "Cypher", 16, 12, 9], ["Sable", "Raze", 21, 13, 5], ["Koda", "Brimstone", 10, 15, 9], ["Riven", "Fade", 17, 11, 11], ["Tython", "KAY/O", 16, 12, 8]]);
 
-  const snap = (date, note, m) => {
-    stmts.push(
-      db
-        .prepare("INSERT INTO rank_snapshots (id,team_id,date,note,ranks) VALUES (?,?,?,?,?)")
-        .bind(uid(8), teamId, date, note, JSON.stringify(Object.fromEntries(Object.entries(m).map(([h, r]) => [pid[h], r])))),
-    );
+  /* Per-match ranked history for the Rank Tracking tab. Walks each player from
+     a start rank to an end rank over N games in realistic ±RR steps, so the
+     demo team has a trajectory to chart. Mirrors what a HenrikDev sync writes:
+     elo is absolute ((tier_id-3)*100 + rr) and tier/rr derive back out of it. */
+  const RANK_TIERS = ["Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ascendant", "Immortal", "Radiant"];
+  const eloOf = (r) => (RANK_TIERS.indexOf(r.tier) * 3 + ((r.div || 1) - 1)) * 100 + (r.rr || 0);
+  const HIST_MAPS = ["Ascent", "Bind", "Haven", "Lotus", "Split", "Sunset", "Icebox", "Breeze"];
+  const CHOP = [18, -15, 22, -12, 16, -20, 24, -14]; // deterministic, so a reseed looks the same
+  const HIST_T0 = Date.parse("2026-07-06T18:00:00Z");
+  const HIST_T1 = Date.parse("2026-09-02T22:00:00Z");
+  const rankHistory = (handle, from, to, games) => {
+    const a = eloOf(from), b = eloOf(to);
+    let elo = a;
+    for (let i = 1; i <= games; i++) {
+      const target = a + ((b - a) * i) / games;
+      let change = Math.round(target + CHOP[i % CHOP.length] * 0.6) - elo;
+      if (!change) change = CHOP[i % CHOP.length] > 0 ? 17 : -16;
+      elo = Math.max(1800, elo + change);
+      const units = Math.floor(elo / 100);
+      stmts.push(
+        db
+          .prepare(
+            "INSERT INTO rank_history (team_id,player_id,match_id,played_at,tier_id,tier_name,rr,last_change,elo,map,season,synced_at) " +
+              "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+          )
+          .bind(
+            teamId, pid[handle], `demo-${handle}-${i}`,
+            new Date(HIST_T0 + ((HIST_T1 - HIST_T0) * i) / games).toISOString(),
+            units + 3,
+            `${RANK_TIERS[Math.floor(units / 3)]} ${(units % 3) + 1}`,
+            elo % 100, change, elo,
+            HIST_MAPS[i % HIST_MAPS.length], "e11a3", Date.now(),
+          ),
+      );
+    }
   };
-  snap("2026-07-06", "Post-bootcamp reset", { nix: R("Ascendant", 3, 35), Sable: R("Immortal", 1, 5), Koda: R("Ascendant", 3, 50), Riven: R("Ascendant", 3, 60), Tython: R("Ascendant", 2, 55), Mireu: R("Ascendant", 3, 15) });
-  snap("2026-07-20", "Consistent scrim wins", { nix: R("Ascendant", 3, 80), Sable: R("Immortal", 1, 45), Koda: R("Ascendant", 3, 70), Riven: R("Immortal", 1, 10), Tython: R("Ascendant", 3, 20), Mireu: R("Ascendant", 3, 60) });
-  snap("2026-08-03", "Broke into Immortal", { nix: R("Immortal", 1, 25), Sable: R("Immortal", 1, 85), Koda: R("Immortal", 1, 5), Riven: R("Immortal", 1, 35), Tython: R("Ascendant", 3, 55), Mireu: R("Immortal", 1, 0) });
-  snap("2026-08-17", "Rough fortnight, Haven losses", { nix: R("Immortal", 1, 15), Sable: R("Immortal", 1, 70), Koda: R("Ascendant", 3, 80), Riven: R("Immortal", 1, 20), Tython: R("Ascendant", 3, 40), Mireu: R("Ascendant", 3, 75) });
-  snap("2026-08-31", "Recovered form pre-qualifier", { nix: R("Immortal", 1, 50), Sable: R("Immortal", 2, 15), Koda: R("Immortal", 1, 5), Riven: R("Immortal", 1, 60), Tython: R("Ascendant", 3, 70), Mireu: R("Immortal", 1, 2) });
+  rankHistory("nix", R("Ascendant", 3, 35), R("Immortal", 1, 55), 26);
+  rankHistory("Sable", R("Immortal", 1, 5), R("Immortal", 2, 25), 24);
+  rankHistory("Koda", R("Ascendant", 3, 50), R("Immortal", 1, 8), 22);
+  rankHistory("Riven", R("Ascendant", 3, 60), R("Immortal", 1, 68), 25);
+  rankHistory("Tython", R("Ascendant", 2, 55), R("Ascendant", 3, 78), 20);
+  rankHistory("Mireu", R("Ascendant", 3, 15), R("Immortal", 1, 5), 18);
 
   const T = (handle, role, tier, div, agents, mech, util, comms, att, verdict, notes) => {
     stmts.push(

@@ -150,18 +150,23 @@ const MFILTER_DEF={map:"",opp:"",result:"",margin:"",player:"",agent:"",comp:[],
 let state={view:"overview",week:mondayOf(new Date()),perfWindow:5,complabMap:"Ascent",tryoutSort:"score",syncing:false,
   mfilter:{...MFILTER_DEF,comp:[]},mfilterOpen:false,rankView:"team",rankHist:null,rankSync:null};
 
+/* the whole navigation — one horizontal tab strip, no icons (they cost width
+   the labels use better, and 10 tabs have to fit) */
 const NAV=[
-  ["overview","Overview",icon("grid")],
-  ["roster","Roster",icon("users")],
-  ["schedule","Schedule",icon("clock")],
-  ["activities","Activities",icon("checks")],
-  ["ranks","Rank Tracking",icon("trend")],
-  ["scrims","Scrims",icon("swords")],
-  ["officials","Officials",icon("trophy")],
-  ["performance","Performance",icon("pulse")],
-  ["complab","Comp Lab",icon("layers")],
-  ["tryouts","Tryouts",icon("search")],
+  ["overview","Overview"],
+  ["roster","Roster"],
+  ["schedule","Schedule"],
+  ["activities","Activities"],
+  ["ranks","Rank tracking"],
+  ["scrims","Scrims"],
+  ["officials","Officials"],
+  ["performance","Performance"],
+  ["complab","Comp lab"],
+  ["tryouts","Tryouts"],
 ];
+/* views whose content is scoped to state.week — only these get the week
+   controls in the title block; everywhere else that row is just noise */
+const WEEK_VIEWS=new Set(["overview","activities","scrims"]);
 function icon(n){const p={
   grid:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>',
   users:'<circle cx="9" cy="8" r="3"/><path d="M4 20c0-3 2-5 5-5s5 2 5 5"/><path d="M16 6a3 3 0 0 1 0 6M15 20c0-3 1-4 3-4"/>',
@@ -173,6 +178,10 @@ function icon(n){const p={
   pulse:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   layers:'<path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/>',
   search:'<circle cx="10" cy="10" r="6"/><path d="M20 20l-5-5"/>',
+  moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/>',
+  auto:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16" fill="currentColor"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
   discord:'<path d="M18 5a16 16 0 0 0-4-1l-.3.6a12 12 0 0 1 3.5 1.8A13 13 0 0 0 6.8 6.4 12 12 0 0 1 10.3 4.6L10 4a16 16 0 0 0-4 1C3.5 9 3 13 3.2 17a16 16 0 0 0 5 2l.8-1.3a10 10 0 0 1-2-1l.5-.4a11 11 0 0 0 9 0l.5.4a10 10 0 0 1-2 1L15 19a16 16 0 0 0 5-2c.3-4.7-.6-8.6-2-12zM9.5 14.5c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7zm5 0c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7z"/>',
 }[n];return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;}
 
@@ -306,19 +315,41 @@ function freeSolve(){
 }
 
 /* ============================================================ render */
+const initials=n=>String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";
+const teamTag=t=>String((t&&(t.tag||t.name))||"?").replace(/\s+/g,"").slice(0,3).toUpperCase();
+
 function render(){
   if(!BUNDLE)return;
   $("#app").hidden=false; $("#gate").hidden=true;
   $("#viewTitle").textContent=NAV.find(n=>n[0]===state.view)[1];
-  $("#crumb").textContent=team().name+" · "+NAV.find(n=>n[0]===state.view)[1];
-  $("#wkLabel").textContent=fmtRange(state.week);
+
+  // masthead
+  const me=ME&&ME.user;
+  $("#acctName").textContent=me?me.name:"";
+  $("#acctInit").textContent=initials(me&&me.name);
+  paintTheme();
+
+  // title block — team, role, and only the controls this view actually uses
+  $("#teamTag").textContent=teamTag(team());
+  $("#teamName").textContent=team().name;
   const rb=$("#roleBadge"); rb.hidden=false; rb.textContent=myRole();
   rb.className="chip "+(canManage()?"accent":canEdit()?"":"warn");
+  const weekly=WEEK_VIEWS.has(state.view);
+  $("#topctl").hidden=!weekly;
+  $("#wkLabel").textContent=fmtRange(state.week);
   $("#tourPill").hidden=!canEdit();
   $("#tourPill").classList.toggle("on",isTournamentWeek(state.week));
-  $("#nav").innerHTML=NAV.map(n=>`<button data-v="${n[0]}" class="${n[0]===state.view?'on':''}">${n[2]}<span>${n[1]}</span></button>`).join("");
-  $("#teamSelect").innerHTML=(ME?ME.teams:[]).map(t=>`<option value="${t.id}" ${t.id===TID()?'selected':''}>${esc(t.name)} · ${esc(t.tag)}</option>`).join("")+`<option value="__new">+ New team…</option>`;
+
+  $("#nav").innerHTML=NAV.map(n=>`<button data-v="${n[0]}" class="${n[0]===state.view?'on':''}">${esc(n[1])}</button>`).join("");
+  keepTabVisible();
   VIEWS[state.view]();
+}
+/* on a phone the tab strip scrolls — keep the active tab on screen */
+function keepTabVisible(){
+  const nav=$("#nav"); if(!nav)return;
+  if(!(nav.scrollWidth>nav.clientWidth))return;
+  const on=nav.querySelector("button.on");
+  if(on&&on.scrollIntoView)on.scrollIntoView({block:"nearest",inline:"center"});
 }
 const M=$("#main");
 
@@ -343,7 +374,7 @@ VIEWS_overview=()=>{
       ${statCard("Scrims this week",`${done}<small>/${goal}</small>`,
         goal?bar(done/goal):"",isTournamentWeek(mon)?"Tournament cadence":"Standard cadence")}
       ${statCard("Team rank",tr?rankStr(tr):"—",
-        `<span class="d ${rDelta>0.15?'up':rDelta<-0.15?'down':'flat'}">${rDelta>0.15?'▲':rDelta<-0.15?'▼':'■'} ${tr?tr.rr+' RR':''}</span>`,
+        tr?`<span class="d ${rDelta>0.15?'up':rDelta<-0.15?'down':'flat'}">${rDelta>0.15?'▲ ':rDelta<-0.15?'▼ ':''}${tr.rr} RR</span>`:"",
         "Avg of starters' live ranks")}
       ${statCard("Scrim attendance",att!=null?Math.round(att*100)+"%":"—","","Last 5 scrims, all players")}
     </div>
@@ -368,7 +399,7 @@ VIEWS_overview=()=>{
         <div class="panel-h"><h3>Next up</h3></div>
         <div class="panel-b">
           ${nextAct?`<div class="eyebrow">${nextAct.d}</div>
-            <div style="font-family:var(--disp);font-weight:600;font-size:15px">${esc(nextAct.title)}</div>
+            <div style="font-family:var(--serif);font-size:20px">${esc(nextAct.title)}</div>
             <div class="sub">${nextAct.time} · ${esc(nextAct.type)}</div>`:
             `<div class="sub">No activities planned this week.</div>`}
           <div style="margin-top:12px"><button class="btn ghost sm" data-go="activities">Plan week →</button></div>
@@ -404,7 +435,7 @@ VIEWS_overview=()=>{
   </div>`;
   M.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.view=b.dataset.go;render();});
 };
-function statCard(k,v,extra,sub){return `<div class="panel pad cut"><div class="stat">
+function statCard(k,v,extra,sub){return `<div class="panel pad"><div class="stat">
   <span class="k">${k}</span><span class="v">${v}</span>
   ${extra||""}
   ${sub?`<span class="d flat">${sub}</span>`:""}</div></div>`;}
@@ -829,7 +860,7 @@ function mmrChart(lines){
   const df=t=>{const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate();};
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
     ${grid.map(u=>`<line x1="${padL}" x2="${w-padR}" y1="${Y(u).toFixed(1)}" y2="${Y(u).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
-      <text x="3" y="${(Y(u)+3).toFixed(1)}" font-size="8.5" fill="var(--ink-3)" font-family="'Chakra Petch',sans-serif">${rankShort(unitsToRank(u))}</text>`).join("")}
+      <text x="3" y="${(Y(u)+3).toFixed(1)}" font-size="9" fill="var(--ink-4)" font-family="'IBM Plex Sans',sans-serif">${rankShort(unitsToRank(u))}</text>`).join("")}
     <text x="${padL}" y="${h-5}" font-size="8" fill="var(--ink-3)" font-family="'IBM Plex Mono',monospace">${df(t0)}</text>
     <text x="${w-padR}" y="${h-5}" font-size="8" fill="var(--ink-3)" text-anchor="end" font-family="'IBM Plex Mono',monospace">${df(t1)}</text>
     ${lines.map(l=>{
@@ -1443,7 +1474,7 @@ VIEWS_tryouts=()=>{
       <div class="panel-h"><h3>Best potentials</h3><span class="hint">excludes Pass</span></div>
       <div class="panel-b">
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
-        ${top.map((t,i)=>`<div class="pcard cut">
+        ${top.map((t,i)=>`<div class="pcard">
           <div class="top"><div class="ico">${['①','②','③'][i]}</div>
           <div style="flex:1"><div class="hd">${esc(t.handle)}</div><div class="rl">${esc(tryoutRoleStr(t))} · ${t.tier} ${t.div}</div></div></div>
           <div class="stat"><span class="k">Composite</span><span class="v">${t.composite.toFixed(1)}<small>/10</small></span></div>
@@ -1579,13 +1610,7 @@ function openForm({title,fields,del},onSubmit){
 }
 
 /* ============================================================ wire shell */
-const APP=$("#app");
-const closeNav=()=>APP.classList.remove("nav-open");
-$("#drawerBtn").onclick=()=>APP.classList.toggle("nav-open");
-$("#railScrim").onclick=closeNav;
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeNav();});
-window.addEventListener("resize",()=>{if(window.innerWidth>860)closeNav();});
-$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b){state.view=b.dataset.v;render();closeNav();}});
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.v){state.view=b.dataset.v;render();}});
 /* delegated (survives M.innerHTML swaps) — replaces inline on* handlers for CSP */
 M.addEventListener("click",e=>{const em=e.target.closest("[data-editmonth]");if(em)editMonth(em.dataset.editmonth);});
 M.addEventListener("change",e=>{const gt=e.target.closest("[data-goaltoggle]");if(gt){const p=gt.dataset.goaltoggle.split("|");toggleMonthGoal(p[0],+p[1]);}});
@@ -1598,20 +1623,63 @@ $("#tourPill").onclick=()=>{
   act(API.put(`/api/teams/${TID()}`,{name:team().name,tag:team().tag,server:team().server,scrimGoal:team().scrimGoal,tournamentWeeks:tw}),
       i<0?"Marked tournament week":"Unmarked");
 };
-$("#teamSelect").onchange=async e=>{
-  closeNav();
-  if(e.target.value==="__new"){ e.target.value=TID(); return newTeamDialog(); }
-  try{ await loadTeam(e.target.value); state.view="overview"; render(); }
-  catch(err){ toast(err.message); }
-};
+/* ---- team switcher (popover on desktop, bottom sheet on a phone) ---- */
+const teamPopOpen=()=>!$("#teamPop").hidden;
+function closeTeamPop(){
+  $("#teamPop").hidden=true; $("#popScrim").hidden=true;
+  $("#teamBtn").setAttribute("aria-expanded","false");
+}
+function openTeamPop(){
+  const pop=$("#teamPop");
+  const teams=(ME?ME.teams:[]);
+  pop.innerHTML=`<div class="pophandle"></div>
+    <div class="poptitle">SWITCH TEAM</div>
+    ${teams.map(t=>`<button class="popitem ${t.id===TID()?'on':''}" data-team="${esc(t.id)}">
+      <span class="ttag">${esc(teamTag(t))}</span>
+      <span class="popname">${esc(t.name)}</span>
+      <span class="poprole">${esc(t.role)}</span>
+    </button>`).join("")}
+    <div class="popdiv"></div>
+    <button class="popitem" data-team="__new"><span class="popplus">${icon('plus')}</span><span class="popname">New team</span></button>`;
+  pop.querySelectorAll("[data-team]").forEach(b=>b.onclick=()=>pickTeam(b.dataset.team));
+  pop.hidden=false; $("#popScrim").hidden=false;
+  $("#teamBtn").setAttribute("aria-expanded","true");
+}
+async function pickTeam(id){
+  closeTeamPop();
+  if(id==="__new")return newTeamDialog();
+  if(id===TID())return;
+  try{
+    await loadTeam(id);
+    // caches are per-team — drop them so the new team doesn't inherit them
+    state.view="overview"; state.rankHist=null; state.rankSync=null; state.rankView="team"; mfClear();
+    render();
+  }catch(err){ toast(err.message); }
+}
+$("#teamBtn").onclick=()=>{ teamPopOpen()?closeTeamPop():openTeamPop(); };
+$("#popScrim").onclick=closeTeamPop;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeTeamPop();});
+
+/* ---- theme: dark -> light -> follow the system ---- */
+function themeMode(){return document.documentElement.getAttribute("data-theme")||"auto";}
+function paintTheme(){
+  const m=themeMode();
+  const btn=$("#btnTheme");
+  btn.innerHTML=icon(m==="dark"?"sun":m==="light"?"moon":"auto");
+  btn.title=`Theme: ${m==="auto"?"follows your system":m}`;
+}
 $("#btnTheme").onclick=()=>{
-  const cur=document.documentElement.getAttribute("data-theme");
-  const next=cur==="dark"?"light":cur==="light"?null:"dark";
-  if(next)document.documentElement.setAttribute("data-theme",next);else document.documentElement.removeAttribute("data-theme");
+  const next={auto:"dark",dark:"light",light:null}[themeMode()];
+  if(next)document.documentElement.setAttribute("data-theme",next);
+  else document.documentElement.removeAttribute("data-theme");
   try{localStorage.setItem("sightline.theme",next||"");}catch(e){}
+  paintTheme();
 };
-$("#btnExport").onclick=async()=>{
-  closeNav();
+$("#btnAccount").onclick=()=>{closeTeamPop();accountDialog();};
+try{const th=localStorage.getItem("sightline.theme");if(th)document.documentElement.setAttribute("data-theme",th);}catch(e){}
+
+/* team backup — lives in the Account dialog now that the rail is gone */
+async function exportTeam(){
   try{
     const data=await API.get(`/api/teams/${TID()}`);
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -1621,9 +1689,7 @@ $("#btnExport").onclick=async()=>{
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     toast("Exported team backup");
   }catch(e){toast(e.message);}
-};
-$("#btnAccount").onclick=()=>{closeNav();accountDialog();};
-try{const th=localStorage.getItem("sightline.theme");if(th)document.documentElement.setAttribute("data-theme",th);}catch(e){}
+}
 
 /* ============================================================ auth gate */
 const GATE=$("#gate");
@@ -1792,11 +1858,15 @@ function accountDialog(){
     </div>
     <button class="btn ghost" id="acc_savepw" style="align-self:flex-start">Update password</button>
     ${hr}
-    <div class="fld"><label>Role on ${esc(team().name)}</label><div style="text-transform:capitalize">${esc(myRole())}</div></div>
+    <div class="eyebrow" style="margin:0">Team · ${esc(team().name)}</div>
+    <div class="fld"><label>Your role</label><div style="text-transform:capitalize">${esc(myRole())}</div></div>
+    ${canEdit()?`<button class="btn ghost" id="acc_teamset">Team settings</button>`:''}
     ${canManage()?`<button class="btn ghost" id="acc_invite">Invite a member</button>`:''}
     ${canManage()?`<button class="btn ghost" id="acc_members">Manage members</button>`:''}
     ${canManage()?`<button class="btn ghost" id="acc_discord">${icon('discord')} Discord notifications${team().hasDiscord?' <span class="chip good" style="margin-left:6px">on</span>':''}</button>`:''}
+    <button class="btn ghost" id="acc_export">Export team backup</button>
     ${isOwner()?`<button class="btn ghost" id="acc_delteam" style="color:var(--crit);border-color:var(--crit)">Delete team</button>`:''}
+    ${hr}
     <button class="btn ghost" id="acc_logout">Sign out</button>`;
   modalShell("Account",body,null,null,{noSave:true});
   body.querySelector("#acc_saveprofile").onclick=async()=>{
@@ -1816,6 +1886,8 @@ function accountDialog(){
       toast("Password updated");
     }catch(e){toast(e.message);}
   };
+  const ts=body.querySelector("#acc_teamset"); if(ts)ts.onclick=()=>{closeModal();editTeamSettings();};
+  const ex=body.querySelector("#acc_export"); if(ex)ex.onclick=exportTeam;
   const iv=body.querySelector("#acc_invite"); if(iv)iv.onclick=()=>{closeModal();inviteDialog();};
   const m=body.querySelector("#acc_members"); if(m)m.onclick=()=>{closeModal();membersDialog();};
   const dc=body.querySelector("#acc_discord"); if(dc)dc.onclick=()=>{closeModal();discordDialog();};

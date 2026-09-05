@@ -208,6 +208,26 @@ async function renderViews() {
     rendered++;
   }
   if (rendered === Object.keys(ctx.__t.VIEWS).length) ok(`all ${rendered} views render clean`);
+
+  /* the shell (masthead, title block, tab strip) lives outside #main, so the
+     loop above can't see it — a broken shell would render every view into a
+     dead page. Assert the pieces render() is responsible for. */
+  ctx.__t.state.view = "overview";
+  ctx.__t.render();
+  const navHtml = byId("nav")._html;
+  const tabs = (navHtml.match(/data-v="/g) || []).length;
+  if (tabs !== rendered) fail(`shell: ${tabs} tabs rendered, expected ${rendered}`);
+  if (!/class="on"/.test(navHtml)) fail("shell: no active tab marked");
+  for (const [id, want] of [["viewTitle", "Overview"], ["teamName", "XPE"], ["teamTag", "XPE"],
+                            ["acctName", "CI"], ["acctInit", "C"], ["roleBadge", "manager"]]) {
+    const got = byId(id).textContent;
+    if (got !== want) fail(`shell: #${id} = "${got}", expected "${want}"`);
+  }
+  if (byId("topctl").hidden) fail("shell: week controls hidden on Overview");
+  ctx.__t.state.view = "roster";
+  ctx.__t.render();
+  if (!byId("topctl").hidden) fail("shell: week controls shown on Roster, which ignores state.week");
+  ok("shell renders: tab strip, team + account identity, per-view week controls");
 }
 
 function rankHistoryFixture() {

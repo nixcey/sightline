@@ -16,7 +16,9 @@ companion app.
   return). `hdFetch()` retries on 429, honouring Retry-After up to a 60s cap
   (Basic key = 30 req/min). `despikeHistory()` drops HenrikDev glitch rows
   (isolated elo spikes, sub-Iron-1, no elo).
-- `src/seed.js` — sample data for new teams
+- `src/seed.js` — sample data for new teams (roster, scrims, tryouts, schedule,
+  activities, and a generated per-match `rank_history` trajectory so the Rank
+  Tracking tab has something to chart)
 - `public/` — frontend: `index.html`, `app.js` (all views), `app.css`, `api.js`
 - `migrations/` — D1 schema, applied in order
 - `agent/` — scrim agent: zero-dep Node script, reads Valorant's local client
@@ -36,6 +38,24 @@ companion app.
   (Overwolf needs Riot approval to distribute Valorant apps)
 
 ## Conventions
+- **Shell / theming:** there is no sidebar. `index.html` is a 60px masthead
+  (brand · theme toggle · account), a **title block** (team-switcher popover +
+  `<h1>` + the controls *that view* owns), then one horizontal tab strip
+  (`#nav`, all 10 views, scrollable on a phone — `keepTabVisible()` keeps the
+  active one on screen). `render()` owns every part of it. The week picker +
+  tournament toggle (`#topctl`) only appear for `WEEK_VIEWS` (overview /
+  activities / scrims); the other seven ignore `state.week`, so showing it
+  there was just noise. Team backup moved off the old rail into the Account
+  dialog (`exportTeam()`); Team settings is reachable from both Roster and
+  Account.
+  Colours come **only** from the token block at the top of `app.css` — light
+  on `:root`, dark redefined under both `prefers-color-scheme` and
+  `[data-theme="dark"]` so the in-app toggle wins either way. `--serif`
+  (IBM Plex Serif) is headings + big numbers, `--sans`/`--disp` is UI,
+  `--mono` numerics, `--brand` (Chakra Petch) the SIGHTLINE mark only.
+  `[hidden]{display:none!important}` near the top is load-bearing: several
+  shell elements are toggled by the attribute against author `display` rules
+  that would otherwise win on equal specificity.
 - **Roles:** `manager` and `igl` are both full admins (`canEdit()` / `canManage()`
   are equal); only `manager` can delete the team (`isOwner()`). `player` is
   read-only except: own roster-player identity/prefs, own schedule blocks, own

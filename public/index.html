@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sightline</title>
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#191C21" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F7F5F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131519" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -17,46 +17,49 @@
 <div id="gate" hidden></div>
 
 <div class="app" id="app" hidden>
-  <div id="railScrim"></div>
-  <nav class="rail">
-    <div class="brand">
-      <div class="mark">SIGHTLINE</div>
-      <div class="sub">ops deck</div>
-    </div>
-    <div class="teamsel">
-      <label for="teamSelect">Active team</label>
-      <select id="teamSelect"></select>
-    </div>
-    <div class="nav" id="nav"></div>
-    <div class="railfoot">
-      <button id="btnTheme">Theme</button>
-      <button id="btnExport">Export</button>
-      <button id="btnAccount">Account</button>
-    </div>
-  </nav>
-  <div class="stage">
-    <header class="topbar">
-      <button class="hmb" id="drawerBtn" aria-label="Menu">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+
+  <header class="masthead">
+    <div class="brand"><span class="shard"></span>SIGHTLINE</div>
+    <div class="mhctl">
+      <button class="ibtn" id="btnTheme" aria-label="Theme"></button>
+      <span class="mhdiv"></span>
+      <button class="acctbtn" id="btnAccount">
+        <span class="avatar" id="acctInit">·</span>
+        <span class="acctname" id="acctName"></span>
       </button>
-      <div class="tt">
-        <div class="crumb" id="crumb">Overview</div>
-        <h1 id="viewTitle">Overview</h1>
-      </div>
-      <div class="topctl">
-        <span class="chip" id="roleBadge" hidden></span>
-        <button class="tourpill" id="tourPill">◆ Tournament week</button>
-        <div class="weekpick">
-          <button id="wkPrev" aria-label="Previous week">‹</button>
-          <span class="lbl" id="wkLabel">—</span>
-          <button id="wkNext" aria-label="Next week">›</button>
+    </div>
+  </header>
+
+  <div class="titlebar">
+    <div class="tt">
+      <div class="ttmeta">
+        <div class="teamsel">
+          <button class="teambtn" id="teamBtn" aria-haspopup="true" aria-expanded="false">
+            <span class="ttag" id="teamTag"></span>
+            <span class="tname" id="teamName"></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="teampop" id="teamPop" hidden></div>
         </div>
+        <span class="chip" id="roleBadge" hidden></span>
       </div>
-    </header>
-    <main id="main"></main>
+      <h1 id="viewTitle">Overview</h1>
+    </div>
+    <div class="topctl" id="topctl">
+      <button class="tourpill" id="tourPill"><i></i>Tournament week</button>
+      <div class="weekpick">
+        <button id="wkPrev" aria-label="Previous week">‹</button>
+        <span class="lbl" id="wkLabel">—</span>
+        <button id="wkNext" aria-label="Next week">›</button>
+      </div>
+    </div>
   </div>
+
+  <nav class="tabs" id="nav"></nav>
+  <main id="main"></main>
 </div>
 
+<div id="popScrim" hidden></div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
 

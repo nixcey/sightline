@@ -9,3 +9,6 @@ desktop/dist/
 dist/
 *.log
 .DS_Store
+
+# design-canvas working files (UI mockups — not part of the build)
+.design/

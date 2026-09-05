@@ -12,6 +12,17 @@ multi-user, role-based.
 
 One Worker serves both the static frontend and the `/api/*` JSON API.
 
+## Interface
+
+A masthead, a title block, and one row of tabs — no sidebar. The title block
+carries the **team switcher** (a popover on desktop, a bottom sheet on a phone)
+and only the controls the current view actually uses: the week picker and
+tournament toggle appear on Overview, Activities and Scrims, and nowhere else.
+The tab strip holds all ten views and scrolls horizontally on narrow screens.
+
+Light and dark are one token set (`app.css`), following your system by default;
+the masthead toggle cycles **dark → light → system** and remembers the choice.
+
 ## Roles
 
 **manager** and **igl** are both full admins. The only difference: only a
